@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <PackageId>Schematic.Core</PackageId>
+    <Version>0.1</Version>
+    <Authors>Ronan Doherty</Authors>
+    <Description></Description>
+    <PackageProjectUrl>https://github.com/rodoch/Schematic.Core/</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/rodoch/Schematic.Core/</RepositoryUrl>
+    <PackageTags>schematic cms</PackageTags>
+    <PackageReleaseNotes>Prerelease</PackageReleaseNotes>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Dapper" Version="1.50.5" />
+    <PackageReference Include="Microsoft.AspNetCore" Version="2.1.1" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication" Version="2.1.1" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.Cookies" Version="2.1.1" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc" Version="2.1.1" />
+    <PackageReference Include="Microsoft.AspNetCore.StaticFiles" Version="2.1.1" />
+    <PackageReference Include="NJsonSchema" Version="9.10.66" />
+    <PackageReference Include="Schematic.Core" Version="0.1.0" />
+    <PackageReference Include="Schematic.Identity" Version="0.1.0" />
+    <PackageReference Include="SixLabors.ImageSharp" Version="1.0.0-beta0005" />
+    <PackageReference Include="SixLabors.ImageSharp.Drawing" Version="1.0.0-beta0005" />
+  </ItemGroup>
+
+  <!--<ItemGroup>
+      <ProjectReference Include="../../Schematic.Core/src/Schematic.Core.csproj" />
+      <ProjectReference Include="../../Schematic.Identity/src/Schematic.Identity.csproj" />
+  </ItemGroup>-->
+
+</Project>
