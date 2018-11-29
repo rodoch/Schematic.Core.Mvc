@@ -4,8 +4,6 @@ using System.Linq;
 using System.Reflection;
 using Microsoft.AspNetCore.Mvc.ApplicationParts;
 using Microsoft.AspNetCore.Mvc.Controllers;
-using Schematic.Controllers;
-using Schematic.Core;
 using Schematic.Identity;
 
 namespace Schematic.Core.Mvc
@@ -14,19 +12,19 @@ namespace Schematic.Core.Mvc
     {
         public void PopulateFeature(IEnumerable<ApplicationPart> parts, ControllerFeature feature)
         {
+            var schematicAssembly = Assembly.Load("Schematic");
             var candidates = new List<Type>();
-            
-            var exportedTypes = AppDomain.CurrentDomain.GetAssemblies()
-                .Where(assembly => !assembly.IsDynamic)
-                .SelectMany(assembly => assembly.GetExportedTypes())
-                .Where(type => type.GetCustomAttributes<SchematicUserAttribute>().Any());
-            
-            //var exportedTypes = Assembly.GetExecutingAssembly().GetExportedTypes()
-            //    .Where(type => type.GetCustomAttributes<SchematicUserAttribute>().Any());
-                
-            foreach (var type in exportedTypes) 
+
+            foreach (var assemblyName in schematicAssembly.GetReferencedAssemblies()) 
             {
-                candidates.Add(type);
+                var assembly = Assembly.Load(assemblyName);
+                var exportedTypes = assembly.GetExportedTypes()
+                    .Where(type => type.GetCustomAttributes<SchematicUserAttribute>().Any());
+                    
+                foreach (var type in exportedTypes) 
+                {
+                    candidates.Add(type);
+                }
             }
             
             feature.Controllers.Add(typeof(UserController<>).MakeGenericType(candidates[0]).GetTypeInfo());

@@ -20,11 +20,13 @@
     <PackageReference Include="Microsoft.AspNetCore.Authentication.Cookies" Version="2.1.1" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc" Version="2.1.1" />
     <PackageReference Include="Microsoft.AspNetCore.StaticFiles" Version="2.1.1" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="2.1.1" />
     <PackageReference Include="NJsonSchema" Version="9.10.66" />
     <PackageReference Include="Schematic.Core" Version="0.1.0" />
     <PackageReference Include="Schematic.Identity" Version="0.1.1" />
     <PackageReference Include="SixLabors.ImageSharp" Version="1.0.0-beta0005" />
     <PackageReference Include="SixLabors.ImageSharp.Drawing" Version="1.0.0-beta0005" />
+    <PackageReference Include="System.ComponentModel.Annotations" Version="4.5.0" />
   </ItemGroup>
 
   <!--<ItemGroup>
