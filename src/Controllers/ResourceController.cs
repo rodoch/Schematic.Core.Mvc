@@ -1,17 +1,12 @@
-using System;
 using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
-using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
 using NJsonSchema;
-using Schematic.Core;
 
 namespace Schematic.Core.Mvc
 {
@@ -23,6 +18,8 @@ namespace Schematic.Core.Mvc
     {
         protected readonly IConfiguration Configuration;
         protected readonly IResourceRepository<T, TResourceFilter> ResourceRepository;
+        protected ClaimsIdentity ClaimsIdentity => User.Identity as ClaimsIdentity;
+        protected int UserID => int.Parse(ClaimsIdentity.FindFirst(ClaimTypes.NameIdentifier)?.Value);
 
         public ResourceController(
             IConfiguration configuration,
@@ -33,9 +30,6 @@ namespace Schematic.Core.Mvc
         }
         
         public static string ResourceType = typeof(T).Name.ToLower();
-
-        protected ClaimsIdentity ClaimsIdentity => User.Identity as ClaimsIdentity;
-        protected int UserID => int.Parse(ClaimsIdentity.FindFirst(ClaimTypes.NameIdentifier)?.Value);
 
         [HttpGet]
         public virtual IActionResult Explorer(int id = 0, string facets = "")
