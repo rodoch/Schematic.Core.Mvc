@@ -122,7 +122,7 @@ namespace Schematic.Core.Mvc
             }
 
             var domain = Request.Host.Value;
-            domain += (Request.PathBase.Value.HasValue()) ? "/" + Request.PathBase.Value : string.Empty;
+            domain += (Request.PathBase.Value.HasValue()) ? Request.PathBase.Value : string.Empty;
             var emailSubject = UserInvitationEmail.Subject();
             var emailBody = UserInvitationEmail.Body(data.Resource, domain, emailSubject, token);
 
@@ -319,7 +319,7 @@ namespace Schematic.Core.Mvc
             TUser resource = await UserRepository.Read(userID);
 
             var domain = Request.Host.Value;
-            domain += (Request.PathBase.Value.HasValue()) ? "/" + Request.PathBase.Value : string.Empty;
+            domain += (Request.PathBase.Value.HasValue()) ? Request.PathBase.Value : string.Empty;
             var token = Convert.ToBase64String(Guid.NewGuid().ToByteArray());
             var emailSubject = UserInvitationEmail.Subject();
             var emailBody = UserInvitationEmail.Body(resource, domain, emailSubject, token);
