@@ -62,14 +62,14 @@ namespace Schematic.Core.Mvc
 
         [Route("create")]
         [HttpGet]
-        public IActionResult Create()
+        public async Task<IActionResult> Create()
         {   
             var result = new UserViewModel<TUser>() 
             { 
                 Resource = new TUser()
             };
 
-            result.Resource.Roles = UserRoleRepository.List() ?? new List<UserRole>();
+            result.Resource.Roles = await UserRoleRepository.List() ?? new List<UserRole>();
 
             return PartialView("_Editor", result);
         }
@@ -78,7 +78,7 @@ namespace Schematic.Core.Mvc
         [HttpPost]
         public async Task<IActionResult> Create(UserViewModel<TUser> data)
         {
-            var roles = UserRoleRepository.List();
+            var roles = await UserRoleRepository.List();
 
             // populate the role list data not returned in post request 
             foreach (var userRole in data.Resource.Roles)
@@ -114,7 +114,7 @@ namespace Schematic.Core.Mvc
             // create token for new user verification
             string token = Convert.ToBase64String(Guid.NewGuid().ToByteArray());
 
-            int newResourceID = UserRepository.Create(data.Resource, token, UserID);
+            int newResourceID = await UserRepository.Create(data.Resource, token, UserID);
 
             if (newResourceID == 0)
             {
@@ -133,9 +133,9 @@ namespace Schematic.Core.Mvc
 
         [Route("read")]
         [HttpGet("{id:int}")]
-        public IActionResult Read(int id)
+        public async Task<IActionResult> Read(int id)
         {
-            TUser resource = UserRepository.Read(id);
+            TUser resource = await UserRepository.Read(id);
 
             if (resource == null)
             {
@@ -163,10 +163,10 @@ namespace Schematic.Core.Mvc
 
         [Route("update")]
         [HttpPost]
-        public IActionResult Update(UserViewModel<TUser> data)
+        public async Task<IActionResult> Update(UserViewModel<TUser> data)
         {
-            var savedData = UserRepository.Read(data.Resource.ID);
-            var roles = UserRoleRepository.List();
+            var savedData = await UserRepository.Read(data.Resource.ID);
+            var roles = await UserRoleRepository.List();
 
             foreach (var userRole in data.Resource.Roles)
             {
@@ -242,14 +242,14 @@ namespace Schematic.Core.Mvc
                 return PartialView("_Editor", data);
             }
 
-            bool update = UserRepository.Update(data.Resource, UserID);
+            int update = await UserRepository.Update(data.Resource, UserID);
 
-            if (!update)
+            if (update <= 0)
             {
                 return BadRequest();
             }
 
-            var updatedResource = UserRepository.Read(data.ResourceID);
+            var updatedResource = await UserRepository.Read(data.ResourceID);
             
             var result = new UserViewModel<TUser>() 
             { 
@@ -272,11 +272,11 @@ namespace Schematic.Core.Mvc
 
         [Route("delete")]
         [HttpPost]
-        public IActionResult Delete(int id)
+        public async Task<IActionResult> Delete(int id)
         {   
-            bool delete = UserRepository.Delete(id, UserID);
+            int delete = await UserRepository.Delete(id, UserID);
 
-            if (!delete)
+            if (delete <= 0)
             {
                 return BadRequest();
             }
@@ -294,9 +294,9 @@ namespace Schematic.Core.Mvc
 
         [Route("list")]
         [HttpPost]
-        public IActionResult List(UserFilter filter)
+        public async Task<IActionResult> List(UserFilter filter)
         {
-            List<TUser> list = UserRepository.List(filter);
+            List<TUser> list = await UserRepository.List(filter);
 
             if (list.Count == 0)
             {
@@ -316,7 +316,7 @@ namespace Schematic.Core.Mvc
         [HttpPost]
         public async Task<IActionResult> Invite(int userID)
         {
-            TUser resource = UserRepository.Read(userID);
+            TUser resource = await UserRepository.Read(userID);
 
             var domain = Request.Host.Value;
             domain += (Request.PathBase.Value.HasValue()) ? "/" + Request.PathBase.Value : string.Empty;

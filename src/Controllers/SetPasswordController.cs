@@ -1,3 +1,4 @@
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Localization;
 using Schematic.Identity;
@@ -55,7 +56,7 @@ namespace Schematic.Core.Mvc
         [Route("{culture}/in/set-password")]
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public IActionResult SetPassword(SetPasswordViewModel data)
+        public async Task<IActionResult> SetPassword(SetPasswordViewModel data)
         {
             ViewData["Email"] = data.Email;
 
@@ -79,7 +80,7 @@ namespace Schematic.Core.Mvc
                 return PartialView(data);
             }
 
-            var tokenResult = UserRepository.ValidateToken(data.Email, data.Token);
+            var tokenResult = await UserRepository.ValidateToken(data.Email, data.Token);
 
             if (tokenResult == TokenVerificationResult.Invalid)
             {
@@ -95,7 +96,7 @@ namespace Schematic.Core.Mvc
                 return PartialView(data);
             }
 
-            AuthenticationUser = UserRepository.ReadByEmail(data.Email);
+            AuthenticationUser = await UserRepository.ReadByEmail(data.Email);
 
             if (AuthenticationUser == null)
             {
@@ -114,7 +115,7 @@ namespace Schematic.Core.Mvc
             }
 
             string passHash = PasswordHasher.HashPassword(AuthenticationUser, data.NewPassword);
-            var setPassHash = UserRepository.SetPassword(AuthenticationUser, passHash);
+            var setPassHash = await UserRepository.SetPassword(AuthenticationUser, passHash);
 
             if (!setPassHash)
             {
