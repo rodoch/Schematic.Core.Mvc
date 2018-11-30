@@ -91,6 +91,7 @@ namespace Schematic.Core.Mvc
             }
 
             var domain = Request.Host.Value;
+            domain += (Request.PathBase.Value.HasValue()) ? "/" + Request.PathBase.Value : string.Empty;
             var emailSubject = ForgotPasswordEmail.Subject();
             var emailBody = ForgotPasswordEmail.Body(AuthenticationUser, domain, emailSubject, token);
 
