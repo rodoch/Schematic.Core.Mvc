@@ -98,7 +98,7 @@ namespace Schematic.Core.Mvc
                     ModelState.AddModelError("InvalidEmail", Localizer[UserErrorMessages.InvalidEmail]);
                 }
 
-                var duplicateUser = UserRepository.ReadByEmail(email);
+                var duplicateUser = await UserRepository.ReadByEmail(email);
 
                 if (duplicateUser != null)
                 {
@@ -186,7 +186,7 @@ namespace Schematic.Core.Mvc
 
                 if (email != savedData.Email)
                 {
-                    var duplicateUser = UserRepository.ReadByEmail(email);
+                    var duplicateUser = await UserRepository.ReadByEmail(email);
 
                     if (duplicateUser != null)
                     {
