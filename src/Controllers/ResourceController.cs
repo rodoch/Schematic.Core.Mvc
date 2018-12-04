@@ -29,7 +29,9 @@ namespace Schematic.Core.Mvc
             ResourceRepository = resourceRepository;
         }
         
-        public static string ResourceType = typeof(T).Name.ToLower();
+        public static string ResourceType = typeof(T).GetAttributeValue((SchematicResourceAttribute r) => r.ControllerName).HasValue() 
+            ? typeof(T).GetAttributeValue((SchematicResourceAttribute r) => r.ControllerName).ToLower()
+            : typeof(T).Name.ToLower();
 
         [HttpGet]
         public virtual IActionResult Explorer(int id = 0, string facets = "")

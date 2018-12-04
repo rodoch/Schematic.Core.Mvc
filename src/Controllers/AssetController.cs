@@ -44,6 +44,18 @@ namespace Schematic.Controllers
         protected ClaimsIdentity ClaimsIdentity => User.Identity as ClaimsIdentity;
         protected int UserID => int.Parse(ClaimsIdentity.FindFirst(ClaimTypes.NameIdentifier)?.Value);
 
+        protected string GetAssetUri(string fileName)
+        {
+            var path = Configuration["AppSettings:ContentWebPath"];
+
+            if (!path.EndsWith(@"/"))
+            {
+                path = path + "/";
+            }
+
+            return path + fileName;
+        }
+
         [Route("image/{fileName}")]
         [HttpGet]
         public IActionResult ImageProxy(string fileName)
@@ -170,18 +182,6 @@ namespace Schematic.Controllers
             }
 
             return Created(response[0].Uri, response);
-        }
-
-        protected string GetAssetUri(string fileName)
-        {
-            var path = Configuration["AppSettings:ContentWebPath"];
-
-            if (!path.EndsWith(@"/"))
-            {
-                path = path + "/";
-            }
-
-            return path + fileName;
         }
     }
 

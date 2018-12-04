@@ -14,6 +14,16 @@ namespace Schematic.Core.Mvc
             var schematicAssembly = Assembly.Load("Schematic");
             var candidates = new List<Type>();
 
+            // Get resources defined within Schematic namespace
+            var schematicAssemblyExportedTypes = schematicAssembly.GetExportedTypes()
+                .Where(type => type.GetCustomAttributes<SchematicResourceAttribute>().Any());
+
+            foreach (var type in schematicAssemblyExportedTypes)
+            {
+                candidates.Add(type);
+            }
+
+            // Get resources defined in referenced libraries
             foreach (var assemblyName in schematicAssembly.GetReferencedAssemblies()) 
             {
                 var assembly = Assembly.Load(assemblyName);
@@ -26,6 +36,7 @@ namespace Schematic.Core.Mvc
                 }
             }
                 
+            // Generate resource controllers
             foreach (var candidate in candidates)
             {
                 string typeName = candidate.Name;
