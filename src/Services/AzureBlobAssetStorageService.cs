@@ -8,6 +8,11 @@ namespace Schematic.Core.Mvc
 {
     public class AzureBlobAssetStorageService : IAssetStorageService
     {
+        public Task<byte[]> GetAssetAsync(AssetDownloadRequest asset)
+        {
+            throw new System.NotImplementedException();
+        }
+
         public async Task<AssetUploadResult> SaveAssetAsync(AssetUploadRequest asset)
         {
             return AssetUploadResult.Success;

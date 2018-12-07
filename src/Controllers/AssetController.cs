@@ -50,14 +50,9 @@ namespace Schematic.Controllers
 
         [Route("image/{fileName}")]
         [HttpGet]
-        public IActionResult DownloadImage(string fileName)
+        public async Task<IActionResult> DownloadAsync(string fileName)
         {
             FilePath = Path.Combine(Configuration["AppSettings:ContentDirectory"], fileName);
-
-            if (!System.IO.File.Exists(FilePath))
-            {
-                return NotFound();
-            }
 
             var provider = new FileExtensionContentTypeProvider();
 
@@ -66,8 +61,21 @@ namespace Schematic.Controllers
                 contentType = "application/octet-stream";
             }
 
-            var image = System.IO.File.OpenRead(FilePath);
-            return File(image, contentType);
+            var downloadRequest = new AssetDownloadRequest()
+            {
+                ContainerName = CloudContainerName,
+                FileName = fileName,
+                FilePath = this.FilePath,
+            };
+
+            var stream = await AssetStorageService.GetAssetAsync(downloadRequest);
+
+            if (stream is null)
+            {
+                return NotFound();
+            }
+
+            return File(stream, contentType);
         }
 
         [Route("upload")]
@@ -101,6 +109,8 @@ namespace Schematic.Controllers
                     File = file,
                     FilePath = this.FilePath
                 };
+
+                //TODO: TryGetAudioAsset(out AudioAsset audio), TryGetVideoAsset(out VideoAsset video)
 
                 if (file.TryGetImageAsset(out ImageAsset image))
                 {
