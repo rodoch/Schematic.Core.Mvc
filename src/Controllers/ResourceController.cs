@@ -77,7 +77,7 @@ namespace Schematic.Core.Mvc
 
         [Route("create")]
         [HttpPost]
-        public async virtual Task<IActionResult> Create(ResourceModel<T> data)
+        public async virtual Task<IActionResult> CreateAsync(ResourceModel<T> data)
         {
             ViewData["ContentWebPath"] = Configuration["AppSettings:ContentWebPath"];
 
@@ -91,7 +91,7 @@ namespace Schematic.Core.Mvc
                 return PartialView("_Editor", data);
             }
 
-            int newResourceID = await ResourceRepository.Create(data.Resource, UserID);
+            int newResourceID = await ResourceRepository.CreateAsync(data.Resource, UserID);
 
             if (newResourceID == 0)
             {
@@ -105,7 +105,7 @@ namespace Schematic.Core.Mvc
 
         [Route("read")]
         [HttpGet("{id:int}")]
-        public async virtual Task<IActionResult> Read(int id, string facets = "")
+        public async virtual Task<IActionResult> ReadAsync(int id, string facets = "")
         {
             ViewData["ContentWebPath"] = Configuration["AppSettings:ContentWebPath"];
 
@@ -114,7 +114,7 @@ namespace Schematic.Core.Mvc
                 return Unauthorized();
             }
 
-            T resource = await ResourceRepository.Read(id);
+            T resource = await ResourceRepository.ReadAsync(id);
 
             if (resource == null)
             {
@@ -133,7 +133,7 @@ namespace Schematic.Core.Mvc
 
         [Route("update")]
         [HttpPost]
-        public async virtual Task<IActionResult> Update(ResourceModel<T> data)
+        public async virtual Task<IActionResult> UpdateAsync(ResourceModel<T> data)
         {
             ViewData["ContentWebPath"] = Configuration["AppSettings:ContentWebPath"];
 
@@ -147,14 +147,14 @@ namespace Schematic.Core.Mvc
                 return PartialView("_Editor", data);
             }
 
-            int update = await ResourceRepository.Update(data.Resource, UserID);
+            int update = await ResourceRepository.UpdateAsync(data.Resource, UserID);
 
             if (update <= 0)
             {
                 return BadRequest();
             }
 
-            T updatedResource = await ResourceRepository.Read(data.ResourceID);
+            T updatedResource = await ResourceRepository.ReadAsync(data.ResourceID);
             
             var result = new ResourceModel<T>() 
             { 
@@ -167,14 +167,14 @@ namespace Schematic.Core.Mvc
 
         [Route("delete")]
         [HttpPost]
-        public async virtual Task<IActionResult> Delete(int id)
+        public async virtual Task<IActionResult> DeleteAsync(int id)
         {   
             if (!User.IsAuthorized(typeof(T))) 
             {
                 return Unauthorized();
             }
 
-            int delete = await ResourceRepository.Delete(id, UserID);
+            int delete = await ResourceRepository.DeleteAsync(id, UserID);
 
             if (delete <= 0)
             {
@@ -205,7 +205,7 @@ namespace Schematic.Core.Mvc
 
         [Route("list")]
         [HttpPost]
-        public async virtual Task<IActionResult> List(TResourceFilter filter)
+        public async virtual Task<IActionResult> ListAsync(TResourceFilter filter)
         {
             ViewData["ContentWebPath"] = Configuration["AppSettings:ContentWebPath"];
             
@@ -214,7 +214,7 @@ namespace Schematic.Core.Mvc
                 return Unauthorized();
             }
 
-            List<T> list = await ResourceRepository.List(filter);
+            List<T> list = await ResourceRepository.ListAsync(filter);
 
             if (list.Count == 0)
             {
@@ -232,7 +232,7 @@ namespace Schematic.Core.Mvc
 
         [Route("schema")]
         [HttpGet]
-        public virtual async Task<IActionResult> Schema()
+        public virtual async Task<IActionResult> SchemaAsync()
         {
             if (!User.IsAuthorized(typeof(T))) 
             {

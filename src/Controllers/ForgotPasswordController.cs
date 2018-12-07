@@ -73,7 +73,7 @@ namespace Schematic.Core.Mvc
                 return PartialView(data);
             }
 
-            AuthenticationUser = await UserRepository.ReadByEmail(data.Email);
+            AuthenticationUser = await UserRepository.ReadByEmailAsync(data.Email);
 
             if (AuthenticationUser == null)
             {
@@ -82,7 +82,7 @@ namespace Schematic.Core.Mvc
             }
 
             string token = Convert.ToBase64String(Guid.NewGuid().ToByteArray());
-            var saveToken = await UserRepository.SaveToken(AuthenticationUser, token);
+            var saveToken = await UserRepository.SaveTokenAsync(AuthenticationUser, token);
 
             if (!saveToken)
             {

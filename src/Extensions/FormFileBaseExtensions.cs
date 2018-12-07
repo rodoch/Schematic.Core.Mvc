@@ -1,18 +1,40 @@
 using System;
 using System.IO;
+using System.Net.Http.Headers;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
+using Schematic.Core;
 
 namespace Schematic.Core.Mvc
 {
     public static class FormFileBaseExtensions
     {
+        public static string GetAssetUri(this IFormFile file, string path, string fileName = "")
+        {
+            if (!fileName.HasValue())
+            {
+                fileName = ContentDispositionHeaderValue.Parse(file.ContentDisposition).FileName.Trim('"');
+                fileName = (!string.IsNullOrWhiteSpace(fileName)) ? fileName : Convert.ToString(Guid.NewGuid());
+            }
+
+            if (!path.EndsWith(@"/"))
+            {
+                path = path + "/";
+            }
+
+            return path + fileName;
+        }
+
         public const int ImageMinimumBytes = 512;
 
-        public static bool IsImage(this IFormFile file)
+        public static bool TryGetImageAsset(this IFormFile file, out ImageAsset image)
         {
+            // Default to null out parameter
+            image = null;
+
             // Check the image mime types
             if (file.ContentType.ToLower() != "image/jpg"
                 && file.ContentType.ToLower() != "image/jpeg"
@@ -65,21 +87,26 @@ namespace Schematic.Core.Mvc
                 return false;
             }
 
-            // Try to instantiate new RGB image
+            // Try to instantiate new RGB image and return metadata
             // If exception is thrown we can assume that it's not a valid image
+            // Some malformed JPEGs will raise a NullReference exception —
+            // This should be fixed will a new release of ImageSharp, see: https://github.com/SixLabors/ImageSharp/issues/721
             using (var stream = file.OpenReadStream())
             {
                 try
                 {
-                    using (Image<Rgba32> image = Image.Load(stream)) {}
+                    using (Image<Rgba32> imageFile = Image.Load(stream)) 
+                    {
+                        image = new ImageAsset()
+                        {
+                            Height = imageFile.Height,
+                            Width = imageFile.Width
+                        };
+                    }
                 }
                 catch (Exception)
                 {
                     return false;
-                }
-                finally
-                {
-                    stream.Position = 0;
                 }
             }
 

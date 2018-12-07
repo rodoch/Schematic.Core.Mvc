@@ -81,7 +81,7 @@ namespace Schematic.Core.Mvc
                 return PartialView(data);
             }
 
-            var tokenResult = await UserRepository.ValidateToken(data.Email, data.Token);
+            var tokenResult = await UserRepository.ValidateTokenAsync(data.Email, data.Token);
 
             if (tokenResult == TokenVerificationResult.Invalid)
             {
@@ -97,7 +97,7 @@ namespace Schematic.Core.Mvc
                 return PartialView(data);
             }
 
-            AuthenticationUser = await UserRepository.ReadByEmail(data.Email);
+            AuthenticationUser = await UserRepository.ReadByEmailAsync(data.Email);
 
             if (AuthenticationUser == null)
             {
@@ -116,7 +116,7 @@ namespace Schematic.Core.Mvc
             }
 
             string passHash = PasswordHasher.HashPassword(AuthenticationUser, data.NewPassword);
-            var setPassHash = await UserRepository.SetPassword(AuthenticationUser, passHash);
+            var setPassHash = await UserRepository.SetPasswordAsync(AuthenticationUser, passHash);
 
             if (!setPassHash)
             {

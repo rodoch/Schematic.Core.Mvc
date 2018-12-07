@@ -72,7 +72,7 @@ namespace Schematic.Core.Mvc
                 return PartialView();
             }
 
-            AuthenticationUser = await UserRepository.ReadByEmail(data.Email);
+            AuthenticationUser = await UserRepository.ReadByEmailAsync(data.Email);
 
             if (AuthenticationUser == null)
             {

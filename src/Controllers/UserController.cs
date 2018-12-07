@@ -45,6 +45,7 @@ namespace Schematic.Core.Mvc
         
         protected ClaimsIdentity ClaimsIdentity => User.Identity as ClaimsIdentity;
         protected int UserID => int.Parse(ClaimsIdentity.FindFirst(ClaimTypes.NameIdentifier)?.Value);
+        protected bool CanEditPassword(TUser user) => (user.ID == UserID) ? true : false;
 
         [HttpGet]
         public IActionResult Explorer(int id = 0)
@@ -69,7 +70,7 @@ namespace Schematic.Core.Mvc
                 Resource = new TUser()
             };
 
-            result.Resource.Roles = await UserRoleRepository.List() ?? new List<UserRole>();
+            result.Resource.Roles = await UserRoleRepository.ListAsync() ?? new List<UserRole>();
 
             return PartialView("_Editor", result);
         }
@@ -78,7 +79,7 @@ namespace Schematic.Core.Mvc
         [HttpPost]
         public async Task<IActionResult> Create(UserViewModel<TUser> data)
         {
-            var roles = await UserRoleRepository.List();
+            var roles = await UserRoleRepository.ListAsync();
 
             // populate the role list data not returned in post request 
             foreach (var userRole in data.Resource.Roles)
@@ -98,7 +99,7 @@ namespace Schematic.Core.Mvc
                     ModelState.AddModelError("InvalidEmail", Localizer[UserErrorMessages.InvalidEmail]);
                 }
 
-                var duplicateUser = await UserRepository.ReadByEmail(email);
+                var duplicateUser = await UserRepository.ReadByEmailAsync(email);
 
                 if (duplicateUser != null)
                 {
@@ -114,7 +115,7 @@ namespace Schematic.Core.Mvc
             // create token for new user verification
             string token = Convert.ToBase64String(Guid.NewGuid().ToByteArray());
 
-            int newResourceID = await UserRepository.Create(data.Resource, token, UserID);
+            int newResourceID = await UserRepository.CreateAsync(data.Resource, token, UserID);
 
             if (newResourceID == 0)
             {
@@ -135,7 +136,7 @@ namespace Schematic.Core.Mvc
         [HttpGet("{id:int}")]
         public async Task<IActionResult> Read(int id)
         {
-            TUser resource = await UserRepository.Read(id);
+            TUser resource = await UserRepository.ReadAsync(id);
 
             if (resource == null)
             {
@@ -165,8 +166,8 @@ namespace Schematic.Core.Mvc
         [HttpPost]
         public async Task<IActionResult> Update(UserViewModel<TUser> data)
         {
-            var savedData = await UserRepository.Read(data.Resource.ID);
-            var roles = await UserRoleRepository.List();
+            var savedData = await UserRepository.ReadAsync(data.Resource.ID);
+            var roles = await UserRoleRepository.ListAsync();
 
             foreach (var userRole in data.Resource.Roles)
             {
@@ -186,7 +187,7 @@ namespace Schematic.Core.Mvc
 
                 if (email != savedData.Email)
                 {
-                    var duplicateUser = await UserRepository.ReadByEmail(email);
+                    var duplicateUser = await UserRepository.ReadByEmailAsync(email);
 
                     if (duplicateUser != null)
                     {
@@ -242,14 +243,14 @@ namespace Schematic.Core.Mvc
                 return PartialView("_Editor", data);
             }
 
-            int update = await UserRepository.Update(data.Resource, UserID);
+            int update = await UserRepository.UpdateAsync(data.Resource, UserID);
 
             if (update <= 0)
             {
                 return BadRequest();
             }
 
-            var updatedResource = await UserRepository.Read(data.ResourceID);
+            var updatedResource = await UserRepository.ReadAsync(data.ResourceID);
             
             var result = new UserViewModel<TUser>() 
             { 
@@ -274,7 +275,7 @@ namespace Schematic.Core.Mvc
         [HttpPost]
         public async Task<IActionResult> Delete(int id)
         {   
-            int delete = await UserRepository.Delete(id, UserID);
+            int delete = await UserRepository.DeleteAsync(id, UserID);
 
             if (delete <= 0)
             {
@@ -296,7 +297,7 @@ namespace Schematic.Core.Mvc
         [HttpPost]
         public async Task<IActionResult> List(UserFilter filter)
         {
-            List<TUser> list = await UserRepository.List(filter);
+            List<TUser> list = await UserRepository.ListAsync(filter);
 
             if (list.Count == 0)
             {
@@ -316,7 +317,7 @@ namespace Schematic.Core.Mvc
         [HttpPost]
         public async Task<IActionResult> Invite(int userID)
         {
-            TUser resource = await UserRepository.Read(userID);
+            TUser resource = await UserRepository.ReadAsync(userID);
 
             var domain = Request.Host.Value;
             domain += (Request.PathBase.Value.HasValue()) ? Request.PathBase.Value : string.Empty;
@@ -327,11 +328,6 @@ namespace Schematic.Core.Mvc
             await EmailSender.SendEmailAsync(resource.Email, emailSubject, emailBody);
 
             return Ok();
-        }
-
-        protected bool CanEditPassword(TUser user)
-        {
-            return (user.ID == UserID) ? true : false;
         }
     }
 }

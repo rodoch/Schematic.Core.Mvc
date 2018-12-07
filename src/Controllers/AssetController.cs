@@ -5,6 +5,7 @@ using System.Linq;
 using System.Net.Http.Headers;
 using System.Security.Claims;
 using System.Threading.Tasks;
+using System.Web;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -24,41 +25,32 @@ namespace Schematic.Controllers
         protected readonly IConfiguration Configuration;
         protected readonly IAssetRepository AssetRepository;
         protected readonly IImageAssetRepository ImageRepository;
+        protected readonly IAssetStorageService AssetStorageService;
 
         public AssetController(
             IConfiguration configuration,
             IAssetRepository assetRepository,
-            IImageAssetRepository imageRepository)
+            IImageAssetRepository imageRepository,
+            IAssetStorageService assetStorageService)
         {
             Configuration = configuration;
             AssetRepository = assetRepository;
             ImageRepository = imageRepository;
+            AssetStorageService = assetStorageService;
         }
 
+        protected string CloudContainerName { get; set; }
         protected string FileName { get; set; }
+        protected string FileExtension { get; set; }
         protected string FilePath { get; set; }
-        protected int ImageHeight { get; set; }
-        protected int ImageWidth { get; set; }
         protected long TotalSize { get; set; }
 
         protected ClaimsIdentity ClaimsIdentity => User.Identity as ClaimsIdentity;
         protected int UserID => int.Parse(ClaimsIdentity.FindFirst(ClaimTypes.NameIdentifier)?.Value);
 
-        protected string GetAssetUri(string fileName)
-        {
-            var path = Configuration["AppSettings:ContentWebPath"];
-
-            if (!path.EndsWith(@"/"))
-            {
-                path = path + "/";
-            }
-
-            return path + fileName;
-        }
-
         [Route("image/{fileName}")]
         [HttpGet]
-        public IActionResult ImageProxy(string fileName)
+        public IActionResult DownloadImage(string fileName)
         {
             FilePath = Path.Combine(Configuration["AppSettings:ContentDirectory"], fileName);
 
@@ -80,119 +72,101 @@ namespace Schematic.Controllers
 
         [Route("upload")]
         [HttpPost]
-        public async Task<IActionResult> Upload(List<IFormFile> files)
+        public async Task<IActionResult> UploadAsync(List<IFormFile> files, string container = "")
         {
-            TotalSize = files.Sum(f => f.Length);
             var response = new List<AssetUploadResponse>();
+            TotalSize = files.Sum(f => f.Length);
+
+            if (container.HasValue())
+            {
+                CloudContainerName = container;
+            }
 
             foreach (var file in files)
             {
-                if (file.Length > 0)
+                if (file.Length == 0)
                 {
-                    FileName = ContentDispositionHeaderValue.Parse(file.ContentDisposition).FileName.Trim('"');
+                    continue;
+                }
 
-                    var fileExtension = Path.GetExtension(FileName);
+                var contentDirectory = Configuration["AppSettings:ContentDirectory"];
+                var contentWebPath = Configuration["AppSettings:ContentWebPath"];
+                FileName = ContentDispositionHeaderValue.Parse(file.ContentDisposition).FileName.Trim('"');
+                FileName = (!string.IsNullOrWhiteSpace(FileName)) ? FileName : Convert.ToString(Guid.NewGuid());
+                FilePath = Path.Combine(contentDirectory, FileName);
+
+                var uploadRequest = new AssetUploadRequest()
+                {
+                    ContainerName = CloudContainerName,
+                    File = file,
+                    FilePath = this.FilePath
+                };
+
+                if (file.TryGetImageAsset(out ImageAsset image))
+                {
+                    // save the file to storage
+                    var saveImageAsset = await AssetStorageService.SaveAssetAsync(uploadRequest);
+
+                    if (saveImageAsset != AssetUploadResult.Success)
+                    {
+                        continue;
+                    }
+
+                    // save image metadata to data store
+                    image.FileName = this.FileName;
+                    image.ContentType = file.ContentType.ToLower();
+                    image.DateCreated = DateTime.UtcNow;
+                    image.CreatedBy = UserID;
+
+                    var imageID = await ImageRepository.CreateAsync(image, UserID);
+
+                    // return upload report to client
+                    var imageAssetResponse = new AssetUploadResponse()
+                    {
+                        ID = imageID,
+                        FileName = this.FileName,
+                        Size = file.Length,
+                        Uri = file.GetAssetUri(contentWebPath, this.FileName)
+                    };
+
+                    response.Add(imageAssetResponse);
+                }
+                else
+                {
+                    // save the file to storage
+                    var saveAsset = await AssetStorageService.SaveAssetAsync(uploadRequest);
+
+                    if (saveAsset != AssetUploadResult.Success)
+                    {
+                        continue;
+                    }
                     
-                    FileName = (!string.IsNullOrWhiteSpace(FileName)) ? FileName : Convert.ToString(Guid.NewGuid());
-                    FilePath = Path.Combine(Configuration["AppSettings:ContentDirectory"], FileName);
-
-                    if (!file.IsImage())
+                    // save file metadata to data store
+                    var asset = new Asset()
                     {
-                        var asset = new Asset()
-                        {
-                            FileName = this.FileName,
-                            ContentType = file.ContentType.ToLower(),
-                            DateCreated = DateTime.UtcNow,
-                            CreatedBy = UserID
-                        };
+                        FileName = this.FileName,
+                        ContentType = file.ContentType.ToLower(),
+                        DateCreated = DateTime.UtcNow,
+                        CreatedBy = UserID
+                    };
 
-                        using (var stream = new FileStream(FilePath, FileMode.Create))
-                        {
-                            await file.CopyToAsync(stream);
-                            await stream.FlushAsync();
-
-                            var assetID = await AssetRepository.Create(asset, UserID);
-
-                            var assetResponse = new AssetUploadResponse()
-                            {
-                                ID = assetID,
-                                FileName = this.FileName,
-                                Size = file.Length,
-                                Uri = GetAssetUri(this.FileName)
-                            };
-
-                            response.Add(assetResponse);
-                        }
-                    }
-                    else
+                    var assetID = await AssetRepository.CreateAsync(asset, UserID);
+                    
+                    // return upload report to client
+                    var assetResponse = new AssetUploadResponse()
                     {
-                        using (var stream = new MemoryStream())
-                        {
-                            await file.CopyToAsync(stream);
+                        ID = assetID,
+                        FileName = this.FileName,
+                        Size = file.Length,
+                        Uri = file.GetAssetUri(contentWebPath, this.FileName)
+                    };
 
-                            if (stream.Position == stream.Length)
-                            {
-                                stream.Position = stream.Seek(0, SeekOrigin.Begin);
-                            }
-
-                            try
-                            {
-                                Image<Rgba32> image = Image.Load(stream);
-
-                                if (image != null)
-                                {
-                                    ImageHeight = image.Height;
-                                    ImageWidth = image.Width;
-                                }
-                            }
-                            catch (NullReferenceException)
-                            {
-                                return null;
-                            }
-                        }
-
-                        var asset = new ImageAsset()
-                        {
-                            FileName = this.FileName,
-                            ContentType = file.ContentType.ToLower(),
-                            Height = ImageHeight,
-                            Width = ImageWidth,
-                            DateCreated = DateTime.UtcNow,
-                            CreatedBy = UserID
-                        };
-
-                        using (var stream = new FileStream(FilePath, FileMode.Create))
-                        {
-                            await file.CopyToAsync(stream);
-                            await stream.FlushAsync();
-                            var imageID = await ImageRepository.Create(asset, UserID);
-
-                            var assetResponse = new AssetUploadResponse()
-                            {
-                                ID = imageID,
-                                FileName = this.FileName,
-                                Size = file.Length,
-                                Uri = GetAssetUri(this.FileName)
-                            };
-
-                            response.Add(assetResponse);
-                        }
-                    }
+                    response.Add(assetResponse);
                 }
             }
 
-            return Created(response[0].Uri, response);
+            var assetUri = HttpUtility.UrlEncode(response[0].Uri, System.Text.Encoding.UTF8);
+            return Created(assetUri, response);
         }
-    }
-
-    public class AssetUploadResponse
-    {
-        public int ID { get; set; }
-
-        public string FileName { get; set; }
-
-        public long Size { get; set; }
-
-        public string Uri { get; set; }
     }
 }
