@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Security.Claims;
 using System.Threading.Tasks;
@@ -50,7 +51,7 @@ namespace Schematic.Controllers
 
         [Route("image/{fileName}")]
         [HttpGet]
-        public async Task<IActionResult> DownloadAsync(string fileName)
+        public async Task<IActionResult> DownloadAsync(string fileName, string attachment = "")
         {
             FilePath = Path.Combine(Configuration["AppSettings:ContentDirectory"], fileName);
 
@@ -73,6 +74,12 @@ namespace Schematic.Controllers
             if (stream is null)
             {
                 return NotFound();
+            }
+
+            if (attachment.HasValue() && attachment == "true")
+            {
+                var fileNameEncoded = HttpUtility.UrlEncode(fileName, System.Text.Encoding.UTF8);
+                Response.Headers["Content-Disposition"] = "attachment; filename=\"" + fileNameEncoded  + "\"";
             }
 
             return File(stream, contentType);

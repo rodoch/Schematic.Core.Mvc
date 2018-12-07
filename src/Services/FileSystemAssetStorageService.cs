@@ -14,11 +14,11 @@ namespace Schematic.Core.Mvc
                 return null;
             }
 
-            using (var reader = new FileStream(asset.FilePath, FileMode.Open, FileAccess.Read))
+            using (var stream = new FileStream(asset.FilePath, FileMode.Open, FileAccess.Read))
             {
-                reader.Seek(0, SeekOrigin.Begin);
-                byte[] output = new byte[reader.Length];
-                var stream = await reader.ReadAsync(output, 0, output.Length);
+                stream.Seek(0, SeekOrigin.Begin);
+                byte[] output = new byte[stream.Length];
+                await stream.ReadAsync(output, 0, output.Length);
                 return output;
             }
         }
