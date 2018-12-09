@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
 using NJsonSchema;
@@ -16,16 +17,16 @@ namespace Schematic.Core.Mvc
         where T : class, new()
         where TResourceFilter : IResourceFilter<T>, new()
     {
-        protected readonly IConfiguration Configuration;
+        protected readonly IOptionsMonitor<SchematicSettings> Settings;
         protected readonly IResourceRepository<T, TResourceFilter> ResourceRepository;
         protected ClaimsIdentity ClaimsIdentity => User.Identity as ClaimsIdentity;
         protected int UserID => int.Parse(ClaimsIdentity.FindFirst(ClaimTypes.NameIdentifier)?.Value);
 
         public ResourceController(
-            IConfiguration configuration,
+            IOptionsMonitor<SchematicSettings> settings,
             IResourceRepository<T, TResourceFilter> resourceRepository)
         {
-            Configuration = configuration;
+            Settings = settings;
             ResourceRepository = resourceRepository;
         }
         
@@ -49,19 +50,28 @@ namespace Schematic.Core.Mvc
             };
 
             string resourceName = typeof(T).GetAttributeValue((SchematicResourceNameAttribute r) => r.Name);
-
             ViewData["ResourceName"] = resourceName;
-            ViewData["ContentWebPath"] = Configuration["AppSettings:ContentWebPath"];
 
             return View(explorer);
+        }
+
+        // TODO: Move ID and title from Read to Meta actions
+        [Route("meta")]
+        [HttpGet]
+        public virtual IActionResult Meta(int id)
+        {
+            if (!User.IsAuthorized(typeof(T))) 
+            {
+                return Unauthorized();
+            }
+
+            return Json(new {});
         }
 
         [Route("create")]
         [HttpGet]
         public virtual IActionResult Create()
         {
-            ViewData["ContentWebPath"] = Configuration["AppSettings:ContentWebPath"];
-
             if (!User.IsAuthorized(typeof(T))) 
             {
                 return Unauthorized();
@@ -79,8 +89,6 @@ namespace Schematic.Core.Mvc
         [HttpPost]
         public async virtual Task<IActionResult> CreateAsync(ResourceModel<T> data)
         {
-            ViewData["ContentWebPath"] = Configuration["AppSettings:ContentWebPath"];
-
             if (!User.IsAuthorized(typeof(T))) 
             {
                 return Unauthorized();
@@ -99,7 +107,6 @@ namespace Schematic.Core.Mvc
             }
 
             string controllerName = ControllerContext.RouteData.Values["controller"].ToString();
-
             return Created(Url.Action("Read", controllerName, new { id = newResourceID }), newResourceID);
         }
 
@@ -107,8 +114,6 @@ namespace Schematic.Core.Mvc
         [HttpGet("{id:int}")]
         public async virtual Task<IActionResult> ReadAsync(int id, string facets = "")
         {
-            ViewData["ContentWebPath"] = Configuration["AppSettings:ContentWebPath"];
-
             if (!User.IsAuthorized(typeof(T))) 
             {
                 return Unauthorized();
@@ -135,8 +140,6 @@ namespace Schematic.Core.Mvc
         [HttpPost]
         public async virtual Task<IActionResult> UpdateAsync(ResourceModel<T> data)
         {
-            ViewData["ContentWebPath"] = Configuration["AppSettings:ContentWebPath"];
-
             if (!User.IsAuthorized(typeof(T))) 
             {
                 return Unauthorized();
@@ -188,8 +191,6 @@ namespace Schematic.Core.Mvc
         [HttpGet]
         public virtual IActionResult Filter(string facets = "")
         {
-            ViewData["ContentWebPath"] = Configuration["AppSettings:ContentWebPath"];
-
             if (!User.IsAuthorized(typeof(T))) 
             {
                 return Unauthorized();
@@ -206,9 +207,7 @@ namespace Schematic.Core.Mvc
         [Route("list")]
         [HttpPost]
         public async virtual Task<IActionResult> ListAsync(TResourceFilter filter)
-        {
-            ViewData["ContentWebPath"] = Configuration["AppSettings:ContentWebPath"];
-            
+        {   
             if (!User.IsAuthorized(typeof(T))) 
             {
                 return Unauthorized();

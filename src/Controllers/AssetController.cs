@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Security.Claims;
 using System.Threading.Tasks;
@@ -11,11 +10,9 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.StaticFiles;
-using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 using Schematic.Core;
 using Schematic.Core.Mvc;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
 
 namespace Schematic.Controllers
 {
@@ -23,18 +20,18 @@ namespace Schematic.Controllers
     [Authorize]
     public class AssetController : Controller
     {
-        protected readonly IConfiguration Configuration;
+        protected readonly IOptionsMonitor<SchematicSettings> Settings;
         protected readonly IAssetRepository AssetRepository;
         protected readonly IImageAssetRepository ImageRepository;
         protected readonly IAssetStorageService AssetStorageService;
 
         public AssetController(
-            IConfiguration configuration,
+            IOptionsMonitor<SchematicSettings> settings,
             IAssetRepository assetRepository,
             IImageAssetRepository imageRepository,
             IAssetStorageService assetStorageService)
         {
-            Configuration = configuration;
+            Settings = settings;
             AssetRepository = assetRepository;
             ImageRepository = imageRepository;
             AssetStorageService = assetStorageService;
@@ -53,7 +50,7 @@ namespace Schematic.Controllers
         [HttpGet]
         public async Task<IActionResult> DownloadAsync(string fileName, string attachment = "")
         {
-            FilePath = Path.Combine(Configuration["AppSettings:ContentDirectory"], fileName);
+            FilePath = Path.Combine(Settings.CurrentValue.AssetDirectory, fileName);
 
             var provider = new FileExtensionContentTypeProvider();
 
@@ -104,11 +101,11 @@ namespace Schematic.Controllers
                     continue;
                 }
 
-                var contentDirectory = Configuration["AppSettings:ContentDirectory"];
-                var contentWebPath = Configuration["AppSettings:ContentWebPath"];
+                var assetDirectory = Settings.CurrentValue.AssetDirectory;
+                var assetWebPath = Settings.CurrentValue.AssetWebPath;
                 FileName = ContentDispositionHeaderValue.Parse(file.ContentDisposition).FileName.Trim('"');
                 FileName = (!string.IsNullOrWhiteSpace(FileName)) ? FileName : Convert.ToString(Guid.NewGuid());
-                FilePath = Path.Combine(contentDirectory, FileName);
+                FilePath = Path.Combine(assetDirectory, FileName);
 
                 var uploadRequest = new AssetUploadRequest()
                 {
@@ -143,7 +140,7 @@ namespace Schematic.Controllers
                         ID = imageID,
                         FileName = this.FileName,
                         Size = file.Length,
-                        Uri = file.GetAssetUri(contentWebPath, this.FileName)
+                        Uri = file.GetAssetUri(assetWebPath, this.FileName)
                     };
 
                     response.Add(imageAssetResponse);
@@ -175,7 +172,7 @@ namespace Schematic.Controllers
                         ID = assetID,
                         FileName = this.FileName,
                         Size = file.Length,
-                        Uri = file.GetAssetUri(contentWebPath, this.FileName)
+                        Uri = file.GetAssetUri(assetWebPath, this.FileName)
                     };
 
                     response.Add(assetResponse);

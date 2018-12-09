@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Localization;
+using Microsoft.Extensions.Options;
 using Schematic.Core;
 using Schematic.Identity;
 
@@ -9,9 +10,8 @@ namespace Schematic.Core.Mvc
 {
     public class ForgotPasswordController : Controller
     {
-        protected readonly ISchematicSettings Settings;
         protected readonly IEmailValidator EmailValidator;
-        protected readonly IEmailSender EmailSender;
+        protected readonly IEmailSenderService EmailSenderService;
         protected readonly IForgotPasswordEmail<User> ForgotPasswordEmail;
         protected readonly IUserRepository<User, UserFilter> UserRepository;
         protected readonly IStringLocalizer<ForgotPasswordViewModel> Localizer;
@@ -19,16 +19,14 @@ namespace Schematic.Core.Mvc
         protected User AuthenticationUser;
 
         public ForgotPasswordController(
-            ISchematicSettings settings,
             IEmailValidator emailValidator,
-            IEmailSender emailSender,
+            IEmailSenderService emailSender,
             IForgotPasswordEmail<User> forgotPasswordEmail,
             IUserRepository<User, UserFilter> userRepository,
             IStringLocalizer<ForgotPasswordViewModel> localizer)
         {
-            Settings = settings;
             EmailValidator = emailValidator;
-            EmailSender = emailSender;
+            EmailSenderService = emailSender;
             ForgotPasswordEmail = forgotPasswordEmail;
             UserRepository = userRepository;
             Localizer = localizer;
@@ -95,7 +93,7 @@ namespace Schematic.Core.Mvc
             var emailSubject = ForgotPasswordEmail.Subject();
             var emailBody = ForgotPasswordEmail.Body(AuthenticationUser, domain, emailSubject, token);
 
-            await EmailSender.SendEmailAsync(data.Email, emailSubject, emailBody);
+            await EmailSenderService.SendEmailAsync(data.Email, emailSubject, emailBody);
 
             data.SendReminderSuccess = true;
 

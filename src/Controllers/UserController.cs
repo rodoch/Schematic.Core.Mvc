@@ -17,7 +17,7 @@ namespace Schematic.Core.Mvc
         protected readonly IPasswordValidator PasswordValidator;
         protected readonly IPasswordHasher<TUser> PasswordHasher;
         protected readonly IEmailValidator EmailValidator;
-        protected readonly IEmailSender EmailSender;
+        protected readonly IEmailSenderService EmailSenderService;
         protected readonly IUserInvitationEmail<TUser> UserInvitationEmail;
         protected readonly IUserRepository<TUser, UserFilter> UserRepository;
         protected readonly IUserRoleRepository<UserRole> UserRoleRepository;
@@ -27,7 +27,7 @@ namespace Schematic.Core.Mvc
             IPasswordValidator passwordValidator,
             IPasswordHasher<TUser> passwordHasher,
             IEmailValidator emailValidator,
-            IEmailSender emailSender,
+            IEmailSenderService emailSender,
             IUserInvitationEmail<TUser> userInvitationEmail,
             IUserRepository<TUser, UserFilter> userRepository,
             IUserRoleRepository<UserRole> userRoleRepository,
@@ -36,7 +36,7 @@ namespace Schematic.Core.Mvc
             PasswordValidator = passwordValidator;
             PasswordHasher = passwordHasher;
             EmailValidator = emailValidator;
-            EmailSender = emailSender;
+            EmailSenderService = emailSender;
             UserInvitationEmail = userInvitationEmail;
             UserRepository = userRepository;
             UserRoleRepository = userRoleRepository;
@@ -127,7 +127,7 @@ namespace Schematic.Core.Mvc
             var emailSubject = UserInvitationEmail.Subject();
             var emailBody = UserInvitationEmail.Body(data.Resource, domain, emailSubject, token);
 
-            await EmailSender.SendEmailAsync(email, emailSubject, emailBody);
+            await EmailSenderService.SendEmailAsync(email, emailSubject, emailBody);
 
             return Created(Url.Action("Read", "User", new { id = newResourceID }), newResourceID);
         }
@@ -325,7 +325,7 @@ namespace Schematic.Core.Mvc
             var emailSubject = UserInvitationEmail.Subject();
             var emailBody = UserInvitationEmail.Body(resource, domain, emailSubject, token);
 
-            await EmailSender.SendEmailAsync(resource.Email, emailSubject, emailBody);
+            await EmailSenderService.SendEmailAsync(resource.Email, emailSubject, emailBody);
 
             return Ok();
         }
