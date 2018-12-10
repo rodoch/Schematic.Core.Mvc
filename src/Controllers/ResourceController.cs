@@ -35,7 +35,7 @@ namespace Schematic.Core.Mvc
             : typeof(T).Name.ToLower();
 
         [HttpGet]
-        public virtual IActionResult Explorer(int id = 0, string facets = "")
+        public virtual IActionResult Explorer(int id = 0, string name = "", string facets = "")
         {
             if (!User.IsAuthorized(typeof(T))) 
             {
@@ -46,10 +46,11 @@ namespace Schematic.Core.Mvc
             {
                 ResourceID = id,
                 ResourceType = ResourceType,
-                Facets = facets.GetFacets()
+                Facets = facets
             };
 
             string resourceName = typeof(T).GetAttributeValue((SchematicResourceNameAttribute r) => r.Name);
+            resourceName = (name.HasValue()) ? name : resourceName;
             ViewData["ResourceName"] = resourceName;
 
             return View(explorer);
@@ -198,7 +199,7 @@ namespace Schematic.Core.Mvc
 
             TResourceFilter filter = new TResourceFilter()
             {
-                Facets = facets.GetFacets()
+                Facets = facets
             };
 
             return PartialView("_ResourceFilter", filter);

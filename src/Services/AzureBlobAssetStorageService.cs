@@ -20,22 +20,20 @@ namespace Schematic.Core.Mvc
         {
             var storageConnectionString = Settings.CurrentValue.CloudStorage.AzureStorage.StorageAccount;
 
-            if (CloudStorageAccount.TryParse(storageConnectionString, out CloudStorageAccount storageAccount))
-            {
-                var cloudBlobClient = storageAccount.CreateCloudBlobClient();
-                var container = cloudBlobClient.GetContainerReference(containerName);
-
-                if (!await container.ExistsAsync())
-                {
-                    throw new StorageException();
-                }
-
-                return container;
-            }
-            else
+            if (!CloudStorageAccount.TryParse(storageConnectionString, out CloudStorageAccount storageAccount))
             {
                 return null;
             }
+
+            var cloudBlobClient = storageAccount.CreateCloudBlobClient();
+            var container = cloudBlobClient.GetContainerReference(containerName);
+
+            if (!await container.ExistsAsync())
+            {
+                throw new StorageException();
+            }
+
+            return container;
         }
 
         public async Task<byte[]> GetAssetAsync(AssetDownloadRequest asset)
