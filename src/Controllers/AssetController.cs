@@ -46,7 +46,7 @@ namespace Schematic.Controllers
         protected ClaimsIdentity ClaimsIdentity => User.Identity as ClaimsIdentity;
         protected int UserID => int.Parse(ClaimsIdentity.FindFirst(ClaimTypes.NameIdentifier)?.Value);
 
-        [Route("image/{fileName}")]
+        [Route("{fileName}")]
         [HttpGet]
         public async Task<IActionResult> DownloadAsync(string fileName, string container = "", string attachment = "")
         {
