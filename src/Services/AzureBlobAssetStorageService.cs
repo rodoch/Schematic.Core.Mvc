@@ -41,14 +41,13 @@ namespace Schematic.Core.Mvc
         public async Task<byte[]> GetAssetAsync(AssetDownloadRequest asset)
         {
             var container = await GetContainerAsync(asset.ContainerName);
-
-            CloudBlockBlob blockBlob = container.GetBlockBlobReference(asset.FileName);
+            var blockBlob = container.GetBlockBlobReference(asset.FileName);
 
             if (!await blockBlob.ExistsAsync())
             {
                 return null;
             }
-            
+
             using (var blobStream = blockBlob.OpenRead())
             {
                 blobStream.Seek(0, SeekOrigin.Begin);
@@ -62,7 +61,21 @@ namespace Schematic.Core.Mvc
         {
             var container = await GetContainerAsync(asset.ContainerName);
 
-            throw new System.NotImplementedException();
+            try
+            {
+                var blockBlob = container.GetBlockBlobReference(asset.FileName);
+
+                using (var blobStream = asset.File.OpenReadStream())
+                {
+                    await blockBlob.UploadFromStreamAsync(blobStream);
+                }
+
+                return AssetUploadResult.Success;
+            }
+            catch
+            {
+                return AssetUploadResult.Failure;
+            }
         }
     }
 }

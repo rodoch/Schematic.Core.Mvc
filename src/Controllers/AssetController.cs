@@ -48,9 +48,14 @@ namespace Schematic.Controllers
 
         [Route("image/{fileName}")]
         [HttpGet]
-        public async Task<IActionResult> DownloadAsync(string fileName, string attachment = "")
+        public async Task<IActionResult> DownloadAsync(string fileName, string container = "", string attachment = "")
         {
             FilePath = Path.Combine(Settings.CurrentValue.AssetDirectory, fileName);
+
+            if (container.HasValue())
+            {
+                CloudContainerName = container;
+            }
 
             var provider = new FileExtensionContentTypeProvider();
 
@@ -111,11 +116,12 @@ namespace Schematic.Controllers
                 {
                     ContainerName = CloudContainerName,
                     File = file,
+                    FileName = this.FileName,
                     FilePath = this.FilePath
                 };
 
                 //TODO: TryGetAudioAsset(out AudioAsset audio), TryGetVideoAsset(out VideoAsset video)
-
+                
                 if (file.TryGetImageAsset(out ImageAsset image))
                 {
                     // save the file to storage
