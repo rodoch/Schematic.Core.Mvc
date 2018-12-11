@@ -3,7 +3,7 @@
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <PackageId>Schematic.Core.Mvc</PackageId>
-    <Version>0.1.15</Version>
+    <Version>0.1.16</Version>
     <Authors>Ronan Doherty</Authors>
     <Description></Description>
     <PackageProjectUrl>https://github.com/rodoch/Schematic.Core.Mvc/</PackageProjectUrl>
@@ -23,7 +23,7 @@
     <PackageReference Include="Microsoft.Azure.Storage.Blob" Version="9.4.1" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="2.1.1" />
     <PackageReference Include="NJsonSchema" Version="9.10.66" />
-    <PackageReference Include="Schematic.Core" Version="0.1.12" />
+    <PackageReference Include="Schematic.Core" Version="0.1.13" />
     <PackageReference Include="Schematic.Identity" Version="0.1.4" />
     <PackageReference Include="SixLabors.ImageSharp" Version="1.0.0-beta0005" />
     <PackageReference Include="SixLabors.ImageSharp.Drawing" Version="1.0.0-beta0005" />
@@ -31,8 +31,8 @@
   </ItemGroup>
 
   <ItemGroup>
-      <!--<ProjectReference Include="../../Schematic.Core/src/Schematic.Core.csproj" />
-      <ProjectReference Include="../../Schematic.Identity/src/Schematic.Identity.csproj" />-->
+      <ProjectReference Include="../../Schematic.Core/src/Schematic.Core.csproj" />
+      <ProjectReference Include="../../Schematic.Identity/src/Schematic.Identity.csproj" />
   </ItemGroup>
 
 </Project>

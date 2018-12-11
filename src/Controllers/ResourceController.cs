@@ -56,11 +56,12 @@ namespace Schematic.Core.Mvc
             return View(explorer);
         }
 
-        // TODO: Move ID and title from Read to Meta actions
         [Route("meta")]
         [HttpGet]
         public virtual IActionResult Meta(int id)
         {
+            // TODO: Move ID and title from Read action to Meta action
+
             if (!User.IsAuthorized(typeof(T))) 
             {
                 return Unauthorized();
@@ -71,7 +72,7 @@ namespace Schematic.Core.Mvc
 
         [Route("create")]
         [HttpGet]
-        public virtual IActionResult Create()
+        public virtual IActionResult Create(string facets = "")
         {
             if (!User.IsAuthorized(typeof(T))) 
             {
@@ -80,7 +81,8 @@ namespace Schematic.Core.Mvc
             
             var result = new ResourceModel<T>() 
             { 
-                Resource = new T()
+                Resource = new T(),
+                Facets = facets
             };
 
             return PartialView("_Editor", result);
@@ -131,7 +133,7 @@ namespace Schematic.Core.Mvc
             { 
                 ResourceID = id,
                 Resource = resource,
-                Facets = facets.GetFacets()
+                Facets = facets
             };
 
             return PartialView("_Editor", result);
