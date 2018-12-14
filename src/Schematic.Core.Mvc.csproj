@@ -3,16 +3,17 @@
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <PackageId>Schematic.Core.Mvc</PackageId>
-    <PackageTags>schematic;cms;mvc</PackageTags>
     <Version>0.1.17</Version>
     <Authors>Ronan Doherty</Authors>
     <Company>Ronan Doherty</Company>
     <Description>Controller logic, view models and services for the Schematic CMS framework</Description>
+    <RepositoryType>Git</RepositoryType>
+    <RepositoryUrl>https://github.com/rodoch/Schematic.Core.Mvc/</RepositoryUrl>
+    <PackageId>Schematic.Core.Mvc</PackageId>
+    <PackageTags>schematic;cms;mvc</PackageTags>
     <PackageIconUrl></PackageIconUrl>
     <PackageProjectUrl>https://github.com/rodoch/Schematic.Core.Mvc/</PackageProjectUrl>
     <PackageLicenseUrl>https://github.com/rodoch/Schematic.Core.Mvc/blob/master/LICENSE</PackageLicenseUrl>
-    <RepositoryUrl>https://github.com/rodoch/Schematic.Core.Mvc/</RepositoryUrl>
     <PackageReleaseNotes>Prerelease</PackageReleaseNotes>
   </PropertyGroup>
 
