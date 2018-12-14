@@ -12,18 +12,18 @@ namespace Schematic.Core.Mvc
 {
     public class AuthenticationController : Controller
     {
-        protected readonly IPasswordHasher<User> PasswordHasher;
-        protected readonly IUserRepository<User, UserFilter> UserRepository;
+        protected readonly IPasswordHasherService<User> PasswordHasherService;
+        protected readonly IUserRepository<User, UserFilter, UserSpecification> UserRepository;
         protected readonly IStringLocalizer<SignInViewModel> Localizer;
 
         protected User AuthenticationUser;
 
         public AuthenticationController(
-            IPasswordHasher<User> passwordHasher,
-            IUserRepository<User, UserFilter> userRepository,
+            IPasswordHasherService<User> passwordHasherService,
+            IUserRepository<User, UserFilter, UserSpecification> userRepository,
             IStringLocalizer<SignInViewModel> localizer)
         {
-            PasswordHasher = passwordHasher;
+            PasswordHasherService = passwordHasherService;
             UserRepository = userRepository;
             Localizer = localizer;
         }
@@ -72,7 +72,12 @@ namespace Schematic.Core.Mvc
                 return PartialView();
             }
 
-            AuthenticationUser = await UserRepository.ReadByEmailAsync(data.Email);
+            var userSpecification = new UserSpecification()
+            {
+                Email = data.Email
+            };
+
+            AuthenticationUser = await UserRepository.ReadAsync(userSpecification);
 
             if (AuthenticationUser == null)
             {
@@ -81,7 +86,7 @@ namespace Schematic.Core.Mvc
                 return PartialView();
             }
 
-            var passwordVerification = PasswordHasher.VerifyHashedPassword(AuthenticationUser, 
+            var passwordVerification = PasswordHasherService.VerifyHashedPassword(AuthenticationUser, 
                 AuthenticationUser.PassHash, SignInData.Password);
 
             if (passwordVerification == PasswordVerificationResult.Failed)

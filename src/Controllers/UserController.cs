@@ -14,29 +14,29 @@ namespace Schematic.Core.Mvc
     [Authorize]
     public class UserController<TUser> : Controller where TUser : ISchematicUser, new()
     {
-        protected readonly IPasswordValidator PasswordValidator;
-        protected readonly IPasswordHasher<TUser> PasswordHasher;
-        protected readonly IEmailValidator EmailValidator;
+        protected readonly IPasswordValidatorService PasswordValidatorService;
+        protected readonly IPasswordHasherService<TUser> PasswordHasherService;
+        protected readonly IEmailValidatorService EmailValidatorService;
         protected readonly IEmailSenderService EmailSenderService;
         protected readonly IUserInvitationEmail<TUser> UserInvitationEmail;
-        protected readonly IUserRepository<TUser, UserFilter> UserRepository;
+        protected readonly IUserRepository<TUser, UserFilter, UserSpecification> UserRepository;
         protected readonly IUserRoleRepository<UserRole> UserRoleRepository;
         protected readonly IStringLocalizer<TUser> Localizer;
 
         public UserController(
-            IPasswordValidator passwordValidator,
-            IPasswordHasher<TUser> passwordHasher,
-            IEmailValidator emailValidator,
-            IEmailSenderService emailSender,
+            IPasswordValidatorService passwordValidatorService,
+            IPasswordHasherService<TUser> passwordHasherService,
+            IEmailValidatorService emailValidatorService,
+            IEmailSenderService emailSenderService,
             IUserInvitationEmail<TUser> userInvitationEmail,
-            IUserRepository<TUser, UserFilter> userRepository,
+            IUserRepository<TUser, UserFilter, UserSpecification> userRepository,
             IUserRoleRepository<UserRole> userRoleRepository,
             IStringLocalizer<TUser> localizer)
         {
-            PasswordValidator = passwordValidator;
-            PasswordHasher = passwordHasher;
-            EmailValidator = emailValidator;
-            EmailSenderService = emailSender;
+            PasswordValidatorService = passwordValidatorService;
+            PasswordHasherService = passwordHasherService;
+            EmailValidatorService = emailValidatorService;
+            EmailSenderService = emailSenderService;
             UserInvitationEmail = userInvitationEmail;
             UserRepository = userRepository;
             UserRoleRepository = userRoleRepository;
@@ -94,12 +94,17 @@ namespace Schematic.Core.Mvc
             // validate user e-mail address
             if (email.HasValue())
             {
-                if (!EmailValidator.IsValidEmail(email))
+                if (!EmailValidatorService.IsValidEmail(email))
                 {
                     ModelState.AddModelError("InvalidEmail", Localizer[UserErrorMessages.InvalidEmail]);
                 }
 
-                var duplicateUser = await UserRepository.ReadByEmailAsync(email);
+                var userSpecification = new UserSpecification()
+                {
+                    Email = email
+                };
+
+                var duplicateUser = await UserRepository.ReadAsync(userSpecification);
 
                 if (duplicateUser != null)
                 {
@@ -136,7 +141,12 @@ namespace Schematic.Core.Mvc
         [HttpGet("{id:int}")]
         public async Task<IActionResult> Read(int id)
         {
-            TUser resource = await UserRepository.ReadAsync(id);
+            var userSpecification = new UserSpecification()
+            {
+                ID = id
+            };
+
+            TUser resource = await UserRepository.ReadAsync(userSpecification);
 
             if (resource == null)
             {
@@ -166,7 +176,13 @@ namespace Schematic.Core.Mvc
         [HttpPost]
         public async Task<IActionResult> Update(UserViewModel<TUser> data)
         {
-            var savedData = await UserRepository.ReadAsync(data.Resource.ID);
+            var userSpecification = new UserSpecification()
+            {
+                ID = data.Resource.ID,
+                Email = data.Resource.Email
+            };
+
+            var savedData = await UserRepository.ReadAsync(userSpecification);
             var roles = await UserRoleRepository.ListAsync();
 
             foreach (var userRole in data.Resource.Roles)
@@ -180,14 +196,14 @@ namespace Schematic.Core.Mvc
 
             if (email.HasValue())
             {
-                if (!EmailValidator.IsValidEmail(email))
+                if (!EmailValidatorService.IsValidEmail(email))
                 {
                     ModelState.AddModelError("InvalidEmail", Localizer[UserErrorMessages.InvalidEmail]);
                 }
 
                 if (email != savedData.Email)
                 {
-                    var duplicateUser = await UserRepository.ReadByEmailAsync(email);
+                    var duplicateUser = await UserRepository.ReadAsync(userSpecification);
 
                     if (duplicateUser != null)
                     {
@@ -221,16 +237,16 @@ namespace Schematic.Core.Mvc
                     return PartialView("_Editor", data);
                 }
 
-                var passwordValidationErrors = PasswordValidator.ValidatePassword(data.Password);
+                var passwordValidationErrors = PasswordValidatorService.ValidatePassword(data.Password);
 
                 if (passwordValidationErrors.Count > 0)
                 {
                     ModelState.AddModelError("PasswordValidationErrors", 
-                        Localizer[PasswordValidator.GetPasswordValidationErrorMessage()]);
+                        Localizer[PasswordValidatorService.GetPasswordValidationErrorMessage()]);
                     return PartialView("_Editor", data);
                 }
 
-                string passHash = PasswordHasher.HashPassword(data.Resource, data.Password);
+                string passHash = PasswordHasherService.HashPassword(data.Resource, data.Password);
                 data.Resource.PassHash = passHash;
             }
             else
@@ -250,7 +266,7 @@ namespace Schematic.Core.Mvc
                 return BadRequest();
             }
 
-            var updatedResource = await UserRepository.ReadAsync(data.ResourceID);
+            var updatedResource = await UserRepository.ReadAsync(userSpecification);
             
             var result = new UserViewModel<TUser>() 
             { 
@@ -317,7 +333,12 @@ namespace Schematic.Core.Mvc
         [HttpPost]
         public async Task<IActionResult> Invite(int userID)
         {
-            TUser resource = await UserRepository.ReadAsync(userID);
+            var userSpecification = new UserSpecification()
+            {
+                ID = userID
+            };
+
+            TUser resource = await UserRepository.ReadAsync(userSpecification);
 
             var domain = Request.Host.Value;
             domain += (Request.PathBase.Value.HasValue()) ? Request.PathBase.Value : string.Empty;

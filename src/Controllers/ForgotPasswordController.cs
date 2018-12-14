@@ -10,23 +10,23 @@ namespace Schematic.Core.Mvc
 {
     public class ForgotPasswordController : Controller
     {
-        protected readonly IEmailValidator EmailValidator;
+        protected readonly IEmailValidatorService EmailValidatorService;
         protected readonly IEmailSenderService EmailSenderService;
         protected readonly IForgotPasswordEmail<User> ForgotPasswordEmail;
-        protected readonly IUserRepository<User, UserFilter> UserRepository;
+        protected readonly IUserRepository<User, UserFilter, UserSpecification> UserRepository;
         protected readonly IStringLocalizer<ForgotPasswordViewModel> Localizer;
         
         protected User AuthenticationUser;
 
         public ForgotPasswordController(
-            IEmailValidator emailValidator,
-            IEmailSenderService emailSender,
+            IEmailValidatorService emailValidatorService,
+            IEmailSenderService emailSenderService,
             IForgotPasswordEmail<User> forgotPasswordEmail,
-            IUserRepository<User, UserFilter> userRepository,
+            IUserRepository<User, UserFilter, UserSpecification> userRepository,
             IStringLocalizer<ForgotPasswordViewModel> localizer)
         {
-            EmailValidator = emailValidator;
-            EmailSenderService = emailSender;
+            EmailValidatorService = emailValidatorService;
+            EmailSenderService = emailSenderService;
             ForgotPasswordEmail = forgotPasswordEmail;
             UserRepository = userRepository;
             Localizer = localizer;
@@ -65,13 +65,18 @@ namespace Schematic.Core.Mvc
                 return PartialView(data);
             }
 
-            if (!EmailValidator.IsValidEmail(data.Email))
+            if (!EmailValidatorService.IsValidEmail(data.Email))
             {
                 ModelState.AddModelError("InvalidEmail", Localizer[AuthenticationErrorMessages.InvalidEmail]);
                 return PartialView(data);
             }
 
-            AuthenticationUser = await UserRepository.ReadByEmailAsync(data.Email);
+            var userSpecification = new UserSpecification()
+            {
+                Email = data.Email
+            };
+
+            AuthenticationUser = await UserRepository.ReadAsync(userSpecification);
 
             if (AuthenticationUser == null)
             {

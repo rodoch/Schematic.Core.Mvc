@@ -10,9 +10,9 @@ namespace Schematic.Core.Mvc
         {
             services.Configure<SchematicSettings>(configuration.GetSection("Schematic"));
 
-            services.AddScoped<IPasswordValidator, PasswordValidator>();
-            services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
-            services.AddScoped<IEmailValidator, EmailValidator>();
+            services.AddScoped<IPasswordValidatorService, PasswordValidatorService>();
+            services.AddScoped<IPasswordHasherService<User>, PasswordHasherService<User>>();
+            services.AddScoped<IEmailValidatorService, EmailValidatorService>();
             
             return services;
         }

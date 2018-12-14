@@ -8,24 +8,24 @@ namespace Schematic.Core.Mvc
 {
     public class SetPasswordController : Controller
     {
-        protected readonly IEmailValidator EmailValidator;
-        protected readonly IPasswordValidator PasswordValidator;
-        protected readonly IPasswordHasher<User> PasswordHasher;
-        protected readonly IUserRepository<User, UserFilter> UserRepository;
+        protected readonly IEmailValidatorService EmailValidatorService;
+        protected readonly IPasswordValidatorService PasswordValidatorService;
+        protected readonly IPasswordHasherService<User> PasswordHasherService;
+        protected readonly IUserRepository<User, UserFilter, UserSpecification> UserRepository;
         protected readonly IStringLocalizer<SetPasswordViewModel> Localizer;
 
         protected User AuthenticationUser;
 
         public SetPasswordController(
-            IEmailValidator emailValidator,
-            IPasswordValidator passwordValidator,
-            IPasswordHasher<User> passwordHasher,
-            IUserRepository<User, UserFilter> userRepository,
+            IEmailValidatorService emailValidatorService,
+            IPasswordValidatorService passwordValidatorService,
+            IPasswordHasherService<User> passwordHasherService,
+            IUserRepository<User, UserFilter, UserSpecification> userRepository,
             IStringLocalizer<SetPasswordViewModel> localizer)
         {
-            EmailValidator = emailValidator;
-            PasswordValidator = passwordValidator;
-            PasswordHasher = passwordHasher;
+            EmailValidatorService = emailValidatorService;
+            PasswordValidatorService = passwordValidatorService;
+            PasswordHasherService = passwordHasherService;
             UserRepository = userRepository;
             Localizer = localizer;
         }
@@ -66,7 +66,7 @@ namespace Schematic.Core.Mvc
                 return PartialView(data);
             }
 
-            if (!EmailValidator.IsValidEmail(data.Email))
+            if (!EmailValidatorService.IsValidEmail(data.Email))
             {
                 ModelState.AddModelError("InvalidEmail", 
                     Localizer[AuthenticationErrorMessages.InvalidEmail]);
@@ -97,7 +97,12 @@ namespace Schematic.Core.Mvc
                 return PartialView(data);
             }
 
-            AuthenticationUser = await UserRepository.ReadByEmailAsync(data.Email);
+            var userSpecification = new UserSpecification()
+            {
+                Email = data.Email
+            };
+
+            AuthenticationUser = await UserRepository.ReadAsync(userSpecification);
 
             if (AuthenticationUser == null)
             {
@@ -106,16 +111,16 @@ namespace Schematic.Core.Mvc
                 return PartialView(data);
             }
 
-            var passwordValidationErrors = PasswordValidator.ValidatePassword(data.NewPassword);
+            var passwordValidationErrors = PasswordValidatorService.ValidatePassword(data.NewPassword);
 
             if (passwordValidationErrors.Count > 0)
             {
                 ModelState.AddModelError("PasswordValidationErrors", 
-                    Localizer[PasswordValidator.GetPasswordValidationErrorMessage()]);
+                    Localizer[PasswordValidatorService.GetPasswordValidationErrorMessage()]);
                 return PartialView(data);
             }
 
-            string passHash = PasswordHasher.HashPassword(AuthenticationUser, data.NewPassword);
+            string passHash = PasswordHasherService.HashPassword(AuthenticationUser, data.NewPassword);
             var setPassHash = await UserRepository.SetPasswordAsync(AuthenticationUser, passHash);
 
             if (!setPassHash)
