@@ -13,21 +13,24 @@ namespace Schematic.Core.Mvc
 {
     [Route("{culture}/resource/[controller]")]
     [Authorize]
-    public class ResourceController<T, TResourceFilter> : Controller 
+    public class ResourceController<T, TFilter> : Controller 
         where T : class, new()
-        where TResourceFilter : IResourceFilter<T>, new()
+        where TFilter : IResourceFilter<T>, new()
     {
         protected readonly IOptionsMonitor<SchematicSettings> Settings;
-        protected readonly IResourceRepository<T, TResourceFilter> ResourceRepository;
+        protected readonly IResourceRepository<T, TFilter> ResourceRepository;
+        protected readonly IResourceContext<T> Context;
         protected ClaimsIdentity ClaimsIdentity => User.Identity as ClaimsIdentity;
         protected int UserID => int.Parse(ClaimsIdentity.FindFirst(ClaimTypes.NameIdentifier)?.Value);
 
         public ResourceController(
             IOptionsMonitor<SchematicSettings> settings,
-            IResourceRepository<T, TResourceFilter> resourceRepository)
+            IResourceRepository<T, TFilter> resourceRepository,
+            IResourceContext<T> context)
         {
             Settings = settings;
             ResourceRepository = resourceRepository;
+            Context = context;
         }
         
         public static string ResourceType = typeof(T).GetAttributeValue((SchematicResourceAttribute r) => r.ControllerName).HasValue() 
@@ -80,10 +83,12 @@ namespace Schematic.Core.Mvc
             }
             
             var result = new ResourceModel<T>() 
-            { 
+            {
                 Resource = new T(),
                 Facets = facets
             };
+
+            result = Context.OnPrepare(result);
 
             return PartialView("_Editor", result);
         }
@@ -96,6 +101,8 @@ namespace Schematic.Core.Mvc
             {
                 return Unauthorized();
             }
+
+            data = Context.OnPrepare(data);
             
             if (!ModelState.IsValid)
             {
@@ -122,7 +129,7 @@ namespace Schematic.Core.Mvc
                 return Unauthorized();
             }
 
-            T resource = await ResourceRepository.ReadAsync(id);
+            var resource = await ResourceRepository.ReadAsync(id);
 
             if (resource == null)
             {
@@ -136,6 +143,8 @@ namespace Schematic.Core.Mvc
                 Facets = facets
             };
 
+            result = Context.OnPrepare(result);
+
             return PartialView("_Editor", result);
         }
 
@@ -147,6 +156,8 @@ namespace Schematic.Core.Mvc
             {
                 return Unauthorized();
             }
+
+            data = Context.OnPrepare(data);
             
             if (!ModelState.IsValid)
             {
@@ -160,13 +171,15 @@ namespace Schematic.Core.Mvc
                 return BadRequest();
             }
 
-            T updatedResource = await ResourceRepository.ReadAsync(data.ResourceID);
+            var updatedResource = await ResourceRepository.ReadAsync(data.ResourceID);
             
             var result = new ResourceModel<T>() 
             { 
                 ResourceID = data.ResourceID,
                 Resource = updatedResource 
             };
+
+            result = Context.OnReturn(result);
 
             return PartialView("_Editor", result);
         }
@@ -199,7 +212,7 @@ namespace Schematic.Core.Mvc
                 return Unauthorized();
             }
 
-            TResourceFilter filter = new TResourceFilter()
+            var filter = new TFilter()
             {
                 Facets = facets
             };
@@ -209,7 +222,7 @@ namespace Schematic.Core.Mvc
 
         [Route("list")]
         [HttpPost]
-        public async virtual Task<IActionResult> ListAsync(TResourceFilter filter)
+        public async virtual Task<IActionResult> ListAsync(TFilter filter)
         {   
             if (!User.IsAuthorized(typeof(T))) 
             {
