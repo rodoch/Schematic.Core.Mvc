@@ -3,7 +3,6 @@ using System.Security.Claims;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
@@ -13,24 +12,24 @@ namespace Schematic.Core.Mvc
 {
     [Route("{culture}/resource/[controller]")]
     [Authorize]
-    public class ResourceController<T, TFilter> : Controller 
+    public class ResourceController<T, TFilter, TContext> : Controller 
         where T : class, new()
         where TFilter : IResourceFilter<T>, new()
+        where TContext : IResourceContext<T>, new()
     {
         protected readonly IOptionsMonitor<SchematicSettings> Settings;
-        protected readonly IResourceRepository<T, TFilter> ResourceRepository;
+        protected readonly IResourceRepository<T, TFilter> Repository;
         protected readonly IResourceContext<T> Context;
         protected ClaimsIdentity ClaimsIdentity => User.Identity as ClaimsIdentity;
         protected int UserID => int.Parse(ClaimsIdentity.FindFirst(ClaimTypes.NameIdentifier)?.Value);
 
         public ResourceController(
             IOptionsMonitor<SchematicSettings> settings,
-            IResourceRepository<T, TFilter> resourceRepository,
-            IResourceContext<T> context)
+            IResourceRepository<T, TFilter> repository)
         {
             Settings = settings;
-            ResourceRepository = resourceRepository;
-            Context = context;
+            Repository = repository;
+            Context = new TContext();
         }
         
         public static string ResourceType = typeof(T).GetAttributeValue((SchematicResourceAttribute r) => r.ControllerName).HasValue() 
@@ -59,23 +58,9 @@ namespace Schematic.Core.Mvc
             return View(explorer);
         }
 
-        [Route("meta")]
-        [HttpGet]
-        public virtual IActionResult Meta(int id)
-        {
-            // TODO: Move ID and title from Read action to Meta action
-
-            if (!User.IsAuthorized(typeof(T))) 
-            {
-                return Unauthorized();
-            }
-
-            return Json(new {});
-        }
-
         [Route("create")]
         [HttpGet]
-        public virtual IActionResult Create(string facets = "")
+        public virtual IActionResult New(string facets = "")
         {
             if (!User.IsAuthorized(typeof(T))) 
             {
@@ -88,7 +73,7 @@ namespace Schematic.Core.Mvc
                 Facets = facets
             };
 
-            result = Context.OnPrepare(result);
+            result = Context.OnNew(result);
 
             return PartialView("_Editor", result);
         }
@@ -102,14 +87,22 @@ namespace Schematic.Core.Mvc
                 return Unauthorized();
             }
 
-            data = Context.OnPrepare(data);
+            data = Context.OnCreate(data);
+
+            if (data.ValidationErrors != null && data.ValidationErrors.Count > 0)
+            {
+                foreach (var error in data.ValidationErrors)
+                {
+                    ModelState.AddModelError(error.Key, error.Value);
+                }
+            }
             
             if (!ModelState.IsValid)
             {
                 return PartialView("_Editor", data);
             }
 
-            int newResourceID = await ResourceRepository.CreateAsync(data.Resource, UserID);
+            int newResourceID = await Repository.CreateAsync(data.Resource, UserID);
 
             if (newResourceID == 0)
             {
@@ -129,7 +122,7 @@ namespace Schematic.Core.Mvc
                 return Unauthorized();
             }
 
-            var resource = await ResourceRepository.ReadAsync(id);
+            var resource = await Repository.ReadAsync(id);
 
             if (resource == null)
             {
@@ -143,7 +136,7 @@ namespace Schematic.Core.Mvc
                 Facets = facets
             };
 
-            result = Context.OnPrepare(result);
+            result = Context.OnRead(result);
 
             return PartialView("_Editor", result);
         }
@@ -157,29 +150,35 @@ namespace Schematic.Core.Mvc
                 return Unauthorized();
             }
 
-            data = Context.OnPrepare(data);
+            data = Context.OnUpdate(data);
+
+            if (data.ValidationErrors != null && data.ValidationErrors.Count > 0)
+            {
+                foreach (var error in data.ValidationErrors)
+                {
+                    ModelState.AddModelError(error.Key, error.Value);
+                }
+            }
             
             if (!ModelState.IsValid)
             {
                 return PartialView("_Editor", data);
             }
 
-            int update = await ResourceRepository.UpdateAsync(data.Resource, UserID);
+            int update = await Repository.UpdateAsync(data.Resource, UserID);
 
             if (update <= 0)
             {
                 return BadRequest();
             }
 
-            var updatedResource = await ResourceRepository.ReadAsync(data.ResourceID);
+            var updatedResource = await Repository.ReadAsync(data.ResourceID);
             
             var result = new ResourceModel<T>() 
             { 
                 ResourceID = data.ResourceID,
                 Resource = updatedResource 
             };
-
-            result = Context.OnReturn(result);
 
             return PartialView("_Editor", result);
         }
@@ -193,7 +192,7 @@ namespace Schematic.Core.Mvc
                 return Unauthorized();
             }
 
-            int delete = await ResourceRepository.DeleteAsync(id, UserID);
+            int delete = await Repository.DeleteAsync(id, UserID);
 
             if (delete <= 0)
             {
@@ -229,7 +228,7 @@ namespace Schematic.Core.Mvc
                 return Unauthorized();
             }
 
-            List<T> list = await ResourceRepository.ListAsync(filter);
+            List<T> list = await Repository.ListAsync(filter);
 
             if (list.Count == 0)
             {

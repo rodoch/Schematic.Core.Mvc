@@ -4,6 +4,7 @@ using System.Linq;
 using System.Reflection;
 using Microsoft.AspNetCore.Mvc.ApplicationParts;
 using Microsoft.AspNetCore.Mvc.Controllers;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Schematic.Core.Mvc
 {
@@ -44,12 +45,22 @@ namespace Schematic.Core.Mvc
                 Type filterType;
                 filterType = schematicAssembly.GetType("Schematic.Filters." + typeName + "Filter");
 
-                if (filterType == null)
+                if (filterType is null)
                 {
-                    filterType = typeof(ResourceFilterModel<>).MakeGenericType(candidate).GetTypeInfo();
+                    filterType = typeof(ResourceFilter<>).MakeGenericType(candidate).GetTypeInfo();
                 }
 
-                feature.Controllers.Add(typeof(ResourceController<,>).MakeGenericType(candidate, filterType).GetTypeInfo());
+                Type contextType;
+                contextType = schematicAssembly.GetType("Schematic.Contexts." + typeName + "Context");
+
+                if (contextType is null)
+                {
+                    contextType = typeof(ResourceContext<>).MakeGenericType(candidate).GetTypeInfo();
+                }
+
+                feature.Controllers.Add(typeof(ResourceController<,,>)
+                    .MakeGenericType(candidate, filterType, contextType)
+                    .GetTypeInfo());
             }
         }
     }
