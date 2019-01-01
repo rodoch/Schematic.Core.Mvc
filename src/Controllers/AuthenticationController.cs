@@ -5,16 +5,15 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Localization;
-using Schematic.Core;
 using Schematic.Identity;
 
 namespace Schematic.Core.Mvc
 {
     public class AuthenticationController : Controller
     {
-        protected readonly IPasswordHasherService<User> PasswordHasherService;
-        protected readonly IUserRepository<User, UserFilter, UserSpecification> UserRepository;
-        protected readonly IStringLocalizer<SignInViewModel> Localizer;
+        private readonly IPasswordHasherService<User> _passwordHasherService;
+        private readonly IUserRepository<User, UserFilter, UserSpecification> _userRepository;
+        private readonly IStringLocalizer<SignInViewModel> _localizer;
 
         protected User AuthenticationUser;
 
@@ -23,15 +22,15 @@ namespace Schematic.Core.Mvc
             IUserRepository<User, UserFilter, UserSpecification> userRepository,
             IStringLocalizer<SignInViewModel> localizer)
         {
-            PasswordHasherService = passwordHasherService;
-            UserRepository = userRepository;
-            Localizer = localizer;
+            _passwordHasherService = passwordHasherService;
+            _userRepository = userRepository;
+            _localizer = localizer;
         }
+        
+        protected bool IsValidUser { get; set; } = true;
 
         [BindProperty]
         public SignInViewModel SignInData { get; set; }
-        
-        protected bool IsValidUser { get; set; } = true;
 
         [Route("{culture?}/{in?}")]
         [HttpGet]
@@ -72,32 +71,33 @@ namespace Schematic.Core.Mvc
                 return PartialView();
             }
 
-            var userSpecification = new UserSpecification()
-            {
-                Email = data.Email
-            };
+            var userSpecification = new UserSpecification() { Email = data.Email };
+            AuthenticationUser = await _userRepository.ReadAsync(userSpecification);
 
-            AuthenticationUser = await UserRepository.ReadAsync(userSpecification);
-
-            if (AuthenticationUser == null)
+            if (AuthenticationUser is null)
             {
-                ModelState.AddModelError("Invalid", 
-                    Localizer[AuthenticationErrorMessages.InvalidData]);
+                ModelState.AddModelError("Invalid", _localizer[AuthenticationErrorMessages.InvalidData]);
                 return PartialView();
             }
 
-            var passwordVerification = PasswordHasherService.VerifyHashedPassword(AuthenticationUser, 
-                AuthenticationUser.PassHash, SignInData.Password);
+            var passwordVerification = _passwordHasherService.VerifyHashedPassword(
+                    user: AuthenticationUser,
+                    hashedPassword: AuthenticationUser.PassHash,
+                    providedPassword: SignInData.Password
+                );
 
             if (passwordVerification == PasswordVerificationResult.Failed)
             {
-                ModelState.AddModelError("Invalid", 
-                    Localizer[AuthenticationErrorMessages.InvalidData]);
+                ModelState.AddModelError("Invalid", _localizer[AuthenticationErrorMessages.InvalidData]);
                 return PartialView();
             }
 
-            var identity = new ClaimsIdentity(CookieAuthenticationDefaults.AuthenticationScheme, 
-                ClaimTypes.Name, ClaimTypes.Role);
+            var identity = new ClaimsIdentity(
+                    authenticationType: CookieAuthenticationDefaults.AuthenticationScheme,
+                    nameType: ClaimTypes.Name,
+                    roleType: ClaimTypes.Role
+                );
+
             identity.AddClaim(new Claim(ClaimTypes.NameIdentifier, AuthenticationUser.ID.ToString()));
             identity.AddClaim(new Claim(ClaimTypes.Name, AuthenticationUser.FullName));
             identity.AddClaim(new Claim(ClaimTypes.Email, AuthenticationUser.Email));
@@ -109,15 +109,18 @@ namespace Schematic.Core.Mvc
 
             var principal = new ClaimsPrincipal(identity);
 
-            await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal, 
-                new AuthenticationProperties { IsPersistent = data.RememberMe });
+            await HttpContext.SignInAsync(
+                scheme: CookieAuthenticationDefaults.AuthenticationScheme,
+                principal: principal,
+                properties: new AuthenticationProperties { IsPersistent = data.RememberMe }
+            );
 
             return Json(new { Route = Url.RouteUrl("default") });
         }
 
         [Route("{culture}/out")]
         [HttpPost]
-        public async Task<IActionResult> SignOut() 
+        public async Task<IActionResult> SignOutAsync()
         { 
             await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
             return RedirectToAction("Authentication");

@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
@@ -6,6 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Localization;
+using MediatR;
 using Schematic.Identity;
 
 namespace Schematic.Core.Mvc
@@ -14,38 +14,34 @@ namespace Schematic.Core.Mvc
     [Authorize]
     public class UserController<TUser> : Controller where TUser : ISchematicUser, new()
     {
-        protected readonly IPasswordValidatorService PasswordValidatorService;
-        protected readonly IPasswordHasherService<TUser> PasswordHasherService;
-        protected readonly IEmailValidatorService EmailValidatorService;
-        protected readonly IEmailSenderService EmailSenderService;
-        protected readonly IUserInvitationEmail<TUser> UserInvitationEmail;
-        protected readonly IUserRepository<TUser, UserFilter, UserSpecification> UserRepository;
-        protected readonly IUserRoleRepository<UserRole> UserRoleRepository;
-        protected readonly IStringLocalizer<TUser> Localizer;
+        private readonly IPasswordValidatorService _passwordValidatorService;
+        private readonly IPasswordHasherService<TUser> _passwordHasherService;
+        private readonly IEmailValidatorService _emailValidatorService;
+        private readonly IUserRepository<TUser, UserFilter, UserSpecification> _userRepository;
+        private readonly IUserRoleRepository<UserRole> _userRoleRepository;
+        private readonly IMediator _mediator;
+        private readonly IStringLocalizer<TUser> _localizer;
 
         public UserController(
             IPasswordValidatorService passwordValidatorService,
             IPasswordHasherService<TUser> passwordHasherService,
             IEmailValidatorService emailValidatorService,
-            IEmailSenderService emailSenderService,
-            IUserInvitationEmail<TUser> userInvitationEmail,
             IUserRepository<TUser, UserFilter, UserSpecification> userRepository,
             IUserRoleRepository<UserRole> userRoleRepository,
+            IMediator mediator,
             IStringLocalizer<TUser> localizer)
         {
-            PasswordValidatorService = passwordValidatorService;
-            PasswordHasherService = passwordHasherService;
-            EmailValidatorService = emailValidatorService;
-            EmailSenderService = emailSenderService;
-            UserInvitationEmail = userInvitationEmail;
-            UserRepository = userRepository;
-            UserRoleRepository = userRoleRepository;
-            Localizer = localizer;
+            _passwordValidatorService = passwordValidatorService;
+            _passwordHasherService = passwordHasherService;
+            _emailValidatorService = emailValidatorService;
+            _userRepository = userRepository;
+            _userRoleRepository = userRoleRepository;
+            _mediator = mediator;
+            _localizer = localizer;
         }
         
         protected ClaimsIdentity ClaimsIdentity => User.Identity as ClaimsIdentity;
         protected int UserID => int.Parse(ClaimsIdentity.FindFirst(ClaimTypes.NameIdentifier)?.Value);
-        protected bool CanEditPassword(TUser user) => (user.ID == UserID) ? true : false;
 
         [HttpGet]
         public IActionResult Explorer(int id = 0)
@@ -53,7 +49,7 @@ namespace Schematic.Core.Mvc
             var explorer = new ResourceExplorerModel()
             {
                 ResourceID = id,
-                ResourceType = typeof(TUser).Name.ToLower()
+                ResourceName = typeof(TUser).Name.ToLower()
             };
 
             ViewData["ResourceName"] = "Users";
@@ -63,40 +59,40 @@ namespace Schematic.Core.Mvc
 
         [Route("create")]
         [HttpGet]
-        public async Task<IActionResult> Create()
+        public async Task<IActionResult> NewAsync()
         {   
             var result = new UserViewModel<TUser>() 
             { 
-                Resource = new TUser()
+                User = new TUser()
             };
 
-            result.Resource.Roles = await UserRoleRepository.ListAsync() ?? new List<UserRole>();
+            result.User.Roles = await _userRoleRepository.ListAsync() ?? new List<UserRole>();
 
             return PartialView("_Editor", result);
         }
 
         [Route("create")]
         [HttpPost]
-        public async Task<IActionResult> Create(UserViewModel<TUser> data)
+        public async Task<IActionResult> CreateAsync(UserViewModel<TUser> userModel)
         {
-            var roles = await UserRoleRepository.ListAsync();
+            var roles = await _userRoleRepository.ListAsync();
 
             // populate the role list data not returned in post request 
-            foreach (var userRole in data.Resource.Roles)
+            foreach (var userRole in userModel.User.Roles)
             {
                 var role = roles.Where(r => r.ID == userRole.ID).FirstOrDefault();
                 userRole.Name = role.Name;
                 userRole.DisplayTitle = role.DisplayTitle;
             }
             
-            string email = data.Resource.Email;
+            string email = userModel.User.Email;
 
             // validate user e-mail address
             if (email.HasValue())
             {
-                if (!EmailValidatorService.IsValidEmail(email))
+                if (!_emailValidatorService.IsValidEmail(email))
                 {
-                    ModelState.AddModelError("InvalidEmail", Localizer[UserErrorMessages.InvalidEmail]);
+                    ModelState.AddModelError("InvalidEmail", _localizer[UserErrorMessages.InvalidEmail]);
                 }
 
                 var userSpecification = new UserSpecification()
@@ -104,199 +100,176 @@ namespace Schematic.Core.Mvc
                     Email = email
                 };
 
-                var duplicateUser = await UserRepository.ReadAsync(userSpecification);
+                var duplicateUser = await _userRepository.ReadAsync(userSpecification);
 
                 if (duplicateUser != null)
                 {
-                    ModelState.AddModelError("DuplicateUser", Localizer[UserErrorMessages.DuplicateUser]);
+                    ModelState.AddModelError("DuplicateUser", _localizer[UserErrorMessages.DuplicateUser]);
                 }
             }
 
             if (!ModelState.IsValid)
             {
-                return PartialView("_Editor", data);
+                return PartialView("_Editor", userModel);
             }
 
-            // create token for new user verification
-            string token = Convert.ToBase64String(Guid.NewGuid().ToByteArray());
+            // persist new user to data store
+            var newUserID = await _userRepository.CreateAsync(userModel.User, UserID);
 
-            int newResourceID = await UserRepository.CreateAsync(data.Resource, token, UserID);
-
-            if (newResourceID == 0)
+            if (newUserID == 0)
             {
                 return NoContent();
             }
 
-            var domain = Request.Host.Value;
-            domain += (Request.PathBase.Value.HasValue()) ? Request.PathBase.Value : string.Empty;
-            var emailSubject = UserInvitationEmail.Subject();
-            var emailBody = UserInvitationEmail.Body(data.Resource, domain, emailSubject, token);
+            // publish user creation and invitation events so notification services can be called
+            userModel.User.ID = newUserID;
+            var userDTO = new UserDTO(userModel.User);
+            var userCreatedEvent = new UserCreated(userDTO);
+            await _mediator.Publish(userCreatedEvent);
 
-            await EmailSenderService.SendEmailAsync(email, emailSubject, emailBody);
-
-            return Created(Url.Action("Read", "User", new { id = newResourceID }), newResourceID);
+            var uri = Url.Action("ReadAsync", "User", new { id = newUserID });
+            return Created(uri, newUserID);
         }
 
         [Route("read")]
         [HttpGet("{id:int}")]
-        public async Task<IActionResult> Read(int id)
+        public async Task<IActionResult> ReadAsync(int id)
         {
             var userSpecification = new UserSpecification()
             {
                 ID = id
             };
 
-            TUser resource = await UserRepository.ReadAsync(userSpecification);
+            var user = await _userRepository.ReadAsync(userSpecification);
 
-            if (resource == null)
+            if (user == null)
             {
                 return NotFound();
             }
             
             var result = new UserViewModel<TUser>() 
             { 
-                ResourceID = id,
-                Resource = resource
+                ID = id,
+                User = user
             };
-
-            if (CanEditPassword(resource))
-            {
-                result.CanEditPassword = true;
-            }
-
-            if (!resource.PassHash.HasValue())
-            {
-                result.UserVerificationRequired = true;
-            }
 
             return PartialView("_Editor", result);
         }
 
         [Route("update")]
         [HttpPost]
-        public async Task<IActionResult> Update(UserViewModel<TUser> data)
+        public async Task<IActionResult> UpdateAsync(UserViewModel<TUser> userModel)
         {
             var userSpecification = new UserSpecification()
             {
-                ID = data.Resource.ID,
-                Email = data.Resource.Email
+                ID = userModel.User.ID,
+                Email = userModel.User.Email
             };
 
-            var savedData = await UserRepository.ReadAsync(userSpecification);
-            var roles = await UserRoleRepository.ListAsync();
+            var savedUser = await _userRepository.ReadAsync(userSpecification);
+            var roles = await _userRoleRepository.ListAsync();
 
-            foreach (var userRole in data.Resource.Roles)
+            foreach (var userRole in userModel.User.Roles)
             {
                 var role = roles.Where(r => r.ID == userRole.ID).FirstOrDefault();
                 userRole.Name = role.Name;
                 userRole.DisplayTitle = role.DisplayTitle;
             }
             
-            string email = data.Resource.Email;
+            var email = userModel.User.Email;
 
             if (email.HasValue())
             {
-                if (!EmailValidatorService.IsValidEmail(email))
+                if (!_emailValidatorService.IsValidEmail(email))
                 {
-                    ModelState.AddModelError("InvalidEmail", Localizer[UserErrorMessages.InvalidEmail]);
+                    ModelState.AddModelError("InvalidEmail", _localizer[UserErrorMessages.InvalidEmail]);
                 }
 
-                if (email != savedData.Email)
+                if (email != savedUser.Email)
                 {
-                    var duplicateUser = await UserRepository.ReadAsync(userSpecification);
+                    var duplicateUser = await _userRepository.ReadAsync(userSpecification);
 
                     if (duplicateUser != null)
                     {
-                        ModelState.AddModelError("DuplicateUser", Localizer[UserErrorMessages.DuplicateUser]);
+                        ModelState.AddModelError("DuplicateUser", _localizer[UserErrorMessages.DuplicateUser]);
                     }
                 }
             }
 
-            if (CanEditPassword(data.Resource))
+            if (userModel.HasIdentity(UserID) && userModel.Password.HasValue()
+                || userModel.HasIdentity(UserID) && userModel.ConfirmationPassword.HasValue())
             {
-                data.CanEditPassword = true;
-            }
-
-            if (!savedData.PassHash.HasValue())
-            {
-                data.UserVerificationRequired = true;
-            }
-
-            if (CanEditPassword(data.Resource) && data.Password.HasValue()
-                || CanEditPassword(data.Resource) && data.ConfirmPassword.HasValue())
-            {
-                if (!data.Password.HasValue() || !data.ConfirmPassword.HasValue())
+                if (userModel.Password.IsNullOrWhiteSpace() || userModel.ConfirmationPassword.IsNullOrWhiteSpace())
                 {
-                    ModelState.AddModelError("Invalid", Localizer[UserErrorMessages.TwoPasswordsRequired]);
-                    return PartialView("_Editor", data);
+                    ModelState.AddModelError("Invalid", _localizer[UserErrorMessages.TwoPasswordsRequired]);
+                    return PartialView("_Editor", userModel);
                 }
 
-                if (data.Password != data.ConfirmPassword)
+                if (userModel.Password != userModel.ConfirmationPassword)
                 {
-                    ModelState.AddModelError("Invalid", Localizer[UserErrorMessages.PasswordsDoNotMatch]);
-                    return PartialView("_Editor", data);
+                    ModelState.AddModelError("Invalid", _localizer[UserErrorMessages.PasswordsDoNotMatch]);
+                    return PartialView("_Editor", userModel);
                 }
 
-                var passwordValidationErrors = PasswordValidatorService.ValidatePassword(data.Password);
+                var passwordValidationErrors = _passwordValidatorService.ValidatePassword(userModel.Password);
 
                 if (passwordValidationErrors.Count > 0)
                 {
-                    ModelState.AddModelError("PasswordValidationErrors", 
-                        Localizer[PasswordValidatorService.GetPasswordValidationErrorMessage()]);
-                    return PartialView("_Editor", data);
+                    ModelState.AddModelError(
+                        key: "PasswordValidationErrors",
+                        errorMessage: _localizer[_passwordValidatorService.GetPasswordValidationErrorMessage()]
+                    );
+                    return PartialView("_Editor", userModel);
                 }
 
-                string passHash = PasswordHasherService.HashPassword(data.Resource, data.Password);
-                data.Resource.PassHash = passHash;
+                var passHash = _passwordHasherService.HashPassword(userModel.User, userModel.Password);
+                userModel.User.PassHash = passHash;
             }
             else
             {
-                data.Resource.PassHash = savedData.PassHash;
+                userModel.User.PassHash = savedUser.PassHash;
             }
 
             if (!ModelState.IsValid)
             {
-                return PartialView("_Editor", data);
+                return PartialView("_Editor", userModel);
             }
 
-            int update = await UserRepository.UpdateAsync(data.Resource, UserID);
+            var update = await _userRepository.UpdateAsync(userModel.User, UserID);
 
             if (update <= 0)
             {
                 return BadRequest();
             }
 
-            var updatedResource = await UserRepository.ReadAsync(userSpecification);
+            var updatedUser = await _userRepository.ReadAsync(userSpecification);
+
+            var userDTO = new UserDTO(updatedUser);
+            var userUpdatedEvent = new UserUpdated(userDTO);
+            await _mediator.Publish(userUpdatedEvent);
             
             var result = new UserViewModel<TUser>() 
             { 
-                ResourceID = data.ResourceID,
-                Resource = updatedResource
+                ID = userModel.ID,
+                User = updatedUser
             };
-
-            if (CanEditPassword(updatedResource))
-            {
-                result.CanEditPassword = true;
-            }
-
-            if (!updatedResource.PassHash.HasValue())
-            {
-                result.UserVerificationRequired = true;
-            }
             
             return PartialView("_Editor", result);
         }
 
         [Route("delete")]
         [HttpPost]
-        public async Task<IActionResult> Delete(int id)
+        public async Task<IActionResult> DeleteAsync(int id)
         {   
-            int delete = await UserRepository.DeleteAsync(id, UserID);
+            var deleteUser = await _userRepository.DeleteAsync(id, UserID);
 
-            if (delete <= 0)
+            if (deleteUser <= 0)
             {
                 return BadRequest();
             }
+
+            var userDeletedEvent = new UserDeleted(id);
+            await _mediator.Publish(userDeletedEvent);
 
             return NoContent();
         }
@@ -305,15 +278,15 @@ namespace Schematic.Core.Mvc
         [HttpGet]
         public IActionResult Filter()
         {
-            UserFilter filter = new UserFilter();
-            return PartialView("_ResourceFilter", filter);
+            var filter = new UserFilter();
+            return PartialView("_Filter", filter);
         }
 
         [Route("list")]
         [HttpPost]
-        public async Task<IActionResult> List(UserFilter filter)
+        public async Task<IActionResult> ListAsync(UserFilter filter)
         {
-            List<TUser> list = await UserRepository.ListAsync(filter);
+            var list = await _userRepository.ListAsync(filter);
 
             if (list.Count == 0)
             {
@@ -326,27 +299,22 @@ namespace Schematic.Core.Mvc
                 ActiveResourceID = filter.ActiveResourceID
             };
 
-            return PartialView("_ResourceList", resourceList);
+            return PartialView("_List", resourceList);
         }
 
         [Route("invite")]
         [HttpPost]
-        public async Task<IActionResult> Invite(int userID)
+        public async Task<IActionResult> InviteAsync(int userID)
         {
             var userSpecification = new UserSpecification()
             {
                 ID = userID
             };
 
-            TUser resource = await UserRepository.ReadAsync(userSpecification);
-
-            var domain = Request.Host.Value;
-            domain += (Request.PathBase.Value.HasValue()) ? Request.PathBase.Value : string.Empty;
-            var token = Convert.ToBase64String(Guid.NewGuid().ToByteArray());
-            var emailSubject = UserInvitationEmail.Subject();
-            var emailBody = UserInvitationEmail.Body(resource, domain, emailSubject, token);
-
-            await EmailSenderService.SendEmailAsync(resource.Email, emailSubject, emailBody);
+            var user = await _userRepository.ReadAsync(userSpecification);
+            var userDTO = new UserDTO(user);
+            var userInvitationEvent = new UserInvitation(userDTO);
+            await _mediator.Publish(userInvitationEvent);
 
             return Ok();
         }

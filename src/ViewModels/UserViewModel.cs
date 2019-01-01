@@ -6,13 +6,9 @@ namespace Schematic.Core.Mvc
 {
     public class UserViewModel<TUser> where TUser : ISchematicUser
     {
-        public int ResourceID { get; set; }
+        public int ID { get; set; }
 
-        public TUser Resource { get; set; }
-
-        public bool UserVerificationRequired { get; set; } = false;
-
-        public bool CanEditPassword { get; set; } = false;
+        public TUser User { get; set; }
         
         [DataType(DataType.Password)]
         [Display(Name = "New password")]
@@ -20,6 +16,10 @@ namespace Schematic.Core.Mvc
 
         [DataType(DataType.Password)]
         [Display(Name = "Confirm new password")]
-        public string ConfirmPassword { get; set; }
+        public string ConfirmationPassword { get; set; }
+
+        public bool HasIdentity(int userID) => User.ID == userID;
+
+        public bool IsVerified() => User.PassHash.HasValue();
     }
 }

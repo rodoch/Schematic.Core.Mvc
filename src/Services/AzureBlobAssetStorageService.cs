@@ -9,16 +9,16 @@ namespace Schematic.Core.Mvc
 {
     public class AzureBlobAssetStorageService : IAssetStorageService
     {
-        protected IOptionsMonitor<SchematicSettings> Settings;
+        private IOptionsMonitor<SchematicSettings> _settings;
 
         public AzureBlobAssetStorageService(IOptionsMonitor<SchematicSettings> settings)
         {
-            Settings = settings;
+            _settings = settings;
         }
 
         protected async Task<CloudBlobContainer> GetContainerAsync(string containerName)
         {
-            var storageConnectionString = Settings.CurrentValue.CloudStorage.AzureStorage.StorageAccount;
+            var storageConnectionString = _settings.CurrentValue.CloudStorage.AzureStorage.StorageAccount;
 
             if (!CloudStorageAccount.TryParse(storageConnectionString, out CloudStorageAccount storageAccount))
             {

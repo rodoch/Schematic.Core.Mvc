@@ -25,9 +25,11 @@ namespace Schematic.Core.Mvc
     
                 if (customNameAttribute != null && customNameAttribute.Route.HasValue())
                 {
+                    var routeAttribute = new RouteAttribute(customNameAttribute.Route);
+
                     controller.Selectors.Add(new SelectorModel
                     {
-                        AttributeRouteModel = new AttributeRouteModel(new RouteAttribute(customNameAttribute.Route)),
+                        AttributeRouteModel = new AttributeRouteModel(routeAttribute),
                     });
                 }
             }

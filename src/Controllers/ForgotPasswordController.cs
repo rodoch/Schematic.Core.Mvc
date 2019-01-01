@@ -10,11 +10,12 @@ namespace Schematic.Core.Mvc
 {
     public class ForgotPasswordController : Controller
     {
-        protected readonly IEmailValidatorService EmailValidatorService;
-        protected readonly IEmailSenderService EmailSenderService;
-        protected readonly IForgotPasswordEmail<User> ForgotPasswordEmail;
-        protected readonly IUserRepository<User, UserFilter, UserSpecification> UserRepository;
-        protected readonly IStringLocalizer<ForgotPasswordViewModel> Localizer;
+        private readonly IEmailValidatorService _emailValidatorService;
+        private readonly IEmailSenderService _emailSenderService;
+        private readonly IForgotPasswordEmail<User> _forgotPasswordEmail;
+        private readonly IUserRepository<User, UserFilter, UserSpecification> _userRepository;
+        private readonly IUserPasswordRepository<UserDTO> _userPasswordRepository;
+        private readonly IStringLocalizer<ForgotPasswordViewModel> _localizer;
         
         protected User AuthenticationUser;
 
@@ -23,13 +24,15 @@ namespace Schematic.Core.Mvc
             IEmailSenderService emailSenderService,
             IForgotPasswordEmail<User> forgotPasswordEmail,
             IUserRepository<User, UserFilter, UserSpecification> userRepository,
+            IUserPasswordRepository<UserDTO> userPasswordRepository,
             IStringLocalizer<ForgotPasswordViewModel> localizer)
         {
-            EmailValidatorService = emailValidatorService;
-            EmailSenderService = emailSenderService;
-            ForgotPasswordEmail = forgotPasswordEmail;
-            UserRepository = userRepository;
-            Localizer = localizer;
+            _emailValidatorService = emailValidatorService;
+            _emailSenderService = emailSenderService;
+            _forgotPasswordEmail = forgotPasswordEmail;
+            _userRepository = userRepository;
+            _userPasswordRepository = userPasswordRepository;
+            _localizer = localizer;
         }
 
         [BindProperty]
@@ -65,9 +68,9 @@ namespace Schematic.Core.Mvc
                 return PartialView(data);
             }
 
-            if (!EmailValidatorService.IsValidEmail(data.Email))
+            if (!_emailValidatorService.IsValidEmail(data.Email))
             {
-                ModelState.AddModelError("InvalidEmail", Localizer[AuthenticationErrorMessages.InvalidEmail]);
+                ModelState.AddModelError("InvalidEmail", _localizer[AuthenticationErrorMessages.InvalidEmail]);
                 return PartialView(data);
             }
 
@@ -76,29 +79,30 @@ namespace Schematic.Core.Mvc
                 Email = data.Email
             };
 
-            AuthenticationUser = await UserRepository.ReadAsync(userSpecification);
+            AuthenticationUser = await _userRepository.ReadAsync(userSpecification);
 
-            if (AuthenticationUser == null)
+            if (AuthenticationUser is null)
             {
-                ModelState.AddModelError("UserDoesNotExist", Localizer[AuthenticationErrorMessages.UserDoesNotExist]);
+                ModelState.AddModelError("UserDoesNotExist", _localizer[AuthenticationErrorMessages.UserDoesNotExist]);
                 return PartialView(data);
             }
 
             string token = Convert.ToBase64String(Guid.NewGuid().ToByteArray());
-            var saveToken = await UserRepository.SaveTokenAsync(AuthenticationUser, token);
+            var userDTO = new UserDTO(AuthenticationUser);
+            var saveToken = await _userPasswordRepository.SavePasswordTokenAsync(userDTO, token);
 
             if (!saveToken)
             {
-                ModelState.AddModelError("ReminderFailed", Localizer[AuthenticationErrorMessages.PasswordReminderFailed]);
+                ModelState.AddModelError("ReminderFailed", _localizer[AuthenticationErrorMessages.PasswordReminderFailed]);
                 return PartialView(data);
             }
 
             var domain = Request.Host.Value;
             domain += (Request.PathBase.Value.HasValue()) ? Request.PathBase.Value : string.Empty;
-            var emailSubject = ForgotPasswordEmail.Subject();
-            var emailBody = ForgotPasswordEmail.Body(AuthenticationUser, domain, emailSubject, token);
+            var emailSubject = _forgotPasswordEmail.Subject();
+            var emailBody = _forgotPasswordEmail.Body(AuthenticationUser, domain, emailSubject, token);
 
-            await EmailSenderService.SendEmailAsync(data.Email, emailSubject, emailBody);
+            await _emailSenderService.SendEmailAsync(data.Email, emailSubject, emailBody);
 
             data.SendReminderSuccess = true;
 

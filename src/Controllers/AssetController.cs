@@ -20,10 +20,10 @@ namespace Schematic.Controllers
     [Authorize]
     public class AssetController : Controller
     {
-        protected readonly IOptionsMonitor<SchematicSettings> Settings;
-        protected readonly IAssetRepository AssetRepository;
-        protected readonly IImageAssetRepository ImageRepository;
-        protected readonly IAssetStorageService AssetStorageService;
+        private readonly IOptionsMonitor<SchematicSettings> _settings;
+        private readonly IAssetRepository _assetRepository;
+        private readonly IImageAssetRepository _imageRepository;
+        private readonly IAssetStorageService _assetStorageService;
 
         public AssetController(
             IOptionsMonitor<SchematicSettings> settings,
@@ -31,10 +31,10 @@ namespace Schematic.Controllers
             IImageAssetRepository imageRepository,
             IAssetStorageService assetStorageService)
         {
-            Settings = settings;
-            AssetRepository = assetRepository;
-            ImageRepository = imageRepository;
-            AssetStorageService = assetStorageService;
+            _settings = settings;
+            _assetRepository = assetRepository;
+            _imageRepository = imageRepository;
+            _assetStorageService = assetStorageService;
         }
 
         protected string CloudContainerName { get; set; }
@@ -50,7 +50,7 @@ namespace Schematic.Controllers
         [HttpGet]
         public async Task<IActionResult> DownloadAsync(string fileName, string container = "", string attachment = "")
         {
-            FilePath = Path.Combine(Settings.CurrentValue.AssetDirectory, fileName);
+            FilePath = Path.Combine(_settings.CurrentValue.AssetDirectory, fileName);
 
             if (container.HasValue())
             {
@@ -71,7 +71,7 @@ namespace Schematic.Controllers
                 FilePath = this.FilePath,
             };
 
-            var stream = await AssetStorageService.GetAssetAsync(downloadRequest);
+            var stream = await _assetStorageService.GetAssetAsync(downloadRequest);
 
             if (stream is null)
             {
@@ -106,8 +106,8 @@ namespace Schematic.Controllers
                     continue;
                 }
 
-                var assetDirectory = Settings.CurrentValue.AssetDirectory;
-                var assetWebPath = Settings.CurrentValue.AssetWebPath;
+                var assetDirectory = _settings.CurrentValue.AssetDirectory;
+                var assetWebPath = _settings.CurrentValue.AssetWebPath;
                 FileName = ContentDispositionHeaderValue.Parse(file.ContentDisposition).FileName.Trim('"');
                 FileName = (!string.IsNullOrWhiteSpace(FileName)) ? FileName : Convert.ToString(Guid.NewGuid());
                 FilePath = Path.Combine(assetDirectory, FileName);
@@ -125,7 +125,7 @@ namespace Schematic.Controllers
                 if (file.TryGetImageAsset(out ImageAsset image))
                 {
                     // save the file to storage
-                    var saveImageAsset = await AssetStorageService.SaveAssetAsync(uploadRequest);
+                    var saveImageAsset = await _assetStorageService.SaveAssetAsync(uploadRequest);
 
                     if (saveImageAsset != AssetUploadResult.Success)
                     {
@@ -138,7 +138,7 @@ namespace Schematic.Controllers
                     image.DateCreated = DateTime.UtcNow;
                     image.CreatedBy = UserID;
 
-                    var imageID = await ImageRepository.CreateAsync(image, UserID);
+                    var imageID = await _imageRepository.CreateAsync(image, UserID);
 
                     // return upload report to client
                     var imageAssetResponse = new AssetUploadResponse()
@@ -154,7 +154,7 @@ namespace Schematic.Controllers
                 else
                 {
                     // save the file to storage
-                    var saveAsset = await AssetStorageService.SaveAssetAsync(uploadRequest);
+                    var saveAsset = await _assetStorageService.SaveAssetAsync(uploadRequest);
 
                     if (saveAsset != AssetUploadResult.Success)
                     {
@@ -170,7 +170,7 @@ namespace Schematic.Controllers
                         CreatedBy = UserID
                     };
 
-                    var assetID = await AssetRepository.CreateAsync(asset, UserID);
+                    var assetID = await _assetRepository.CreateAsync(asset, UserID);
                     
                     // return upload report to client
                     var assetResponse = new AssetUploadResponse()

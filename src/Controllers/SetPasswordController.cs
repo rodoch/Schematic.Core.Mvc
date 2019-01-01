@@ -8,11 +8,12 @@ namespace Schematic.Core.Mvc
 {
     public class SetPasswordController : Controller
     {
-        protected readonly IEmailValidatorService EmailValidatorService;
-        protected readonly IPasswordValidatorService PasswordValidatorService;
-        protected readonly IPasswordHasherService<User> PasswordHasherService;
-        protected readonly IUserRepository<User, UserFilter, UserSpecification> UserRepository;
-        protected readonly IStringLocalizer<SetPasswordViewModel> Localizer;
+        private readonly IEmailValidatorService _emailValidatorService;
+        private readonly IPasswordValidatorService _passwordValidatorService;
+        private readonly IPasswordHasherService<User> _passwordHasherService;
+        private readonly IUserRepository<User, UserFilter, UserSpecification> _userRepository;
+        private readonly IUserPasswordRepository<UserDTO> _userPasswordRepository;
+        private readonly IStringLocalizer<SetPasswordViewModel> _localizer;
 
         protected User AuthenticationUser;
 
@@ -21,13 +22,15 @@ namespace Schematic.Core.Mvc
             IPasswordValidatorService passwordValidatorService,
             IPasswordHasherService<User> passwordHasherService,
             IUserRepository<User, UserFilter, UserSpecification> userRepository,
+            IUserPasswordRepository<UserDTO> userPasswordRepository,
             IStringLocalizer<SetPasswordViewModel> localizer)
         {
-            EmailValidatorService = emailValidatorService;
-            PasswordValidatorService = passwordValidatorService;
-            PasswordHasherService = passwordHasherService;
-            UserRepository = userRepository;
-            Localizer = localizer;
+            _emailValidatorService = emailValidatorService;
+            _passwordValidatorService = passwordValidatorService;
+            _passwordHasherService = passwordHasherService;
+            _userRepository = userRepository;
+            _userPasswordRepository = userPasswordRepository;
+            _localizer = localizer;
         }
 
         [BindProperty]
@@ -66,34 +69,30 @@ namespace Schematic.Core.Mvc
                 return PartialView(data);
             }
 
-            if (!EmailValidatorService.IsValidEmail(data.Email))
+            if (!_emailValidatorService.IsValidEmail(data.Email))
             {
-                ModelState.AddModelError("InvalidEmail", 
-                    Localizer[AuthenticationErrorMessages.InvalidEmail]);
+                ModelState.AddModelError("InvalidEmail", _localizer[AuthenticationErrorMessages.InvalidEmail]);
                 return PartialView(data);
             }
 
             if (data.NewPassword.HasValue() && data.ConfirmNewPassword.HasValue() 
                 && data.NewPassword != data.ConfirmNewPassword)
             {
-                ModelState.AddModelError("PasswordsDoNotMatch", 
-                    Localizer[AuthenticationErrorMessages.PasswordsDoNotMatch]);
+                ModelState.AddModelError("PasswordsDoNotMatch", _localizer[AuthenticationErrorMessages.PasswordsDoNotMatch]);
                 return PartialView(data);
             }
 
-            var tokenResult = await UserRepository.ValidateTokenAsync(data.Email, data.Token);
+            var tokenResult = await _userPasswordRepository.ValidatePasswordTokenAsync(data.Email, data.Token);
 
             if (tokenResult == TokenVerificationResult.Invalid)
             {
-                ModelState.AddModelError("InvalidToken", 
-                    Localizer[AuthenticationErrorMessages.InvalidToken]);
+                ModelState.AddModelError("InvalidToken", _localizer[AuthenticationErrorMessages.InvalidToken]);
                 return PartialView(data);
             }
 
             if (tokenResult == TokenVerificationResult.Expired)
             {
-                ModelState.AddModelError("ExpiredToken", 
-                    Localizer[AuthenticationErrorMessages.ExpiredToken]);
+                ModelState.AddModelError("ExpiredToken", _localizer[AuthenticationErrorMessages.ExpiredToken]);
                 return PartialView(data);
             }
 
@@ -102,31 +101,32 @@ namespace Schematic.Core.Mvc
                 Email = data.Email
             };
 
-            AuthenticationUser = await UserRepository.ReadAsync(userSpecification);
+            AuthenticationUser = await _userRepository.ReadAsync(userSpecification);
 
-            if (AuthenticationUser == null)
+            if (AuthenticationUser is null)
             {
-                ModelState.AddModelError("UserDoesNotExist", 
-                    Localizer[AuthenticationErrorMessages.UserDoesNotExist]);
+                ModelState.AddModelError("UserDoesNotExist", _localizer[AuthenticationErrorMessages.UserDoesNotExist]);
                 return PartialView(data);
             }
 
-            var passwordValidationErrors = PasswordValidatorService.ValidatePassword(data.NewPassword);
+            var passwordValidationErrors = _passwordValidatorService.ValidatePassword(data.NewPassword);
 
             if (passwordValidationErrors.Count > 0)
             {
-                ModelState.AddModelError("PasswordValidationErrors", 
-                    Localizer[PasswordValidatorService.GetPasswordValidationErrorMessage()]);
+                ModelState.AddModelError(
+                    key: "PasswordValidationErrors",
+                    errorMessage: _localizer[_passwordValidatorService.GetPasswordValidationErrorMessage()]
+                );
                 return PartialView(data);
             }
 
-            string passHash = PasswordHasherService.HashPassword(AuthenticationUser, data.NewPassword);
-            var setPassHash = await UserRepository.SetPasswordAsync(AuthenticationUser, passHash);
+            string hashedPassword = _passwordHasherService.HashPassword(AuthenticationUser, data.NewPassword);
+            var userDTO = new UserDTO(AuthenticationUser);
+            var setPassword = await _userPasswordRepository.SetPasswordAsync(userDTO, hashedPassword);
 
-            if (!setPassHash)
+            if (!setPassword)
             {
-                ModelState.AddModelError("PasswordSetFailed", 
-                    Localizer[AuthenticationErrorMessages.PasswordSetFailed]);
+                ModelState.AddModelError("PasswordSetFailed", _localizer[AuthenticationErrorMessages.PasswordSetFailed]);
                 return PartialView();
             }
 
