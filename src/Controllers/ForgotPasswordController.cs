@@ -2,8 +2,6 @@ using System;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Localization;
-using Microsoft.Extensions.Options;
-using Schematic.Core;
 using Schematic.Identity;
 
 namespace Schematic.Core.Mvc

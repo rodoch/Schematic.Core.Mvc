@@ -114,7 +114,7 @@ namespace Schematic.Core.Mvc
                 principal: principal,
                 properties: new AuthenticationProperties { IsPersistent = data.RememberMe }
             );
-
+            
             return Json(new { Route = Url.RouteUrl("default") });
         }
 
