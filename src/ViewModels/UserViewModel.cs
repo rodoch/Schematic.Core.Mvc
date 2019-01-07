@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using Ansa.Extensions;
 using Schematic.Identity;
 
 namespace Schematic.Core.Mvc
